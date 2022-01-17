@@ -1,0 +1,10 @@
+# Adjust and uncomment these values as needed
+
+cacn = Self-signed CA
+cadays = test
+#certdays = 365
+city = City name
+company = Company name
+country = US
+state = State name
+unit = Department
