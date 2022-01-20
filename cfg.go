@@ -59,6 +59,10 @@ func CfgFromFile(fn string) (*Cfg, error) {
 		tmp[0] = strings.ToLower(strings.TrimSpace(tmp[0]))
 		tmp[1] = strings.TrimSpace(tmp[1])
 
+		// Strip leading and trailing ", if coming from bash CertifyMe
+		tmp[1] = strings.TrimPrefix(tmp[1], "\"")
+		tmp[1] = strings.TrimSuffix(tmp[1], "\"")
+
 		if e = cfg.SetOption(tmp[0], tmp[1]); e != nil {
 			return nil, e
 		}
