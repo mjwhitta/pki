@@ -153,9 +153,11 @@ func validate() {
 		}
 	}
 
-	// Undo must be used alone
-	if flags.undo {
-		if (len(flags.csr) > 0) || flags.revoke {
+	// Sample and undo must be used alone
+	if flags.sample || flags.undo {
+		if flags.sample && flags.undo {
+			cli.Usage(InvalidOption)
+		} else if (len(flags.csr) > 0) || flags.revoke {
 			cli.Usage(InvalidOption)
 		} else if (len(flags.clients) + cli.NArg()) > 0 {
 			cli.Usage(ExtraArgument)

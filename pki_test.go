@@ -1,11 +1,10 @@
 package pki_test
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/x509"
 	"encoding/hex"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,7 +15,7 @@ import (
 )
 
 func setup(t *testing.T, dirs ...string) *pki.PKI {
-	var dir string = tempDir(t)
+	var dir string = t.TempDir()
 	var e error
 	var p *pki.PKI
 
@@ -33,48 +32,6 @@ func setup(t *testing.T, dirs ...string) *pki.PKI {
 	return p
 }
 
-// This is better than t.TempDir() b/c it's self-contained (so doesn't
-// break GitLab runners) and it ensures the permissions are fixed
-// before trying to delete during Cleanup().
-func tempDir(t *testing.T) string {
-	var b []byte = make([]byte, 32)
-	var e error
-	var out string
-
-	if _, e = rand.Read(b); e != nil {
-		t.Fatal("could not create random temp directory")
-	}
-
-	out = filepath.Join("testdata", "Test_"+hex.EncodeToString(b))
-
-	t.Cleanup(
-		func() {
-			// Ensure temp dir can be deleted
-			filepath.WalkDir(
-				out,
-				func(path string, d fs.DirEntry, e error) error {
-					if e != nil {
-						return e
-					}
-
-					if d.IsDir() {
-						e = os.Chmod(path, 0o700)
-					} else {
-						e = os.Chmod(path, 0o600)
-					}
-					assert.Nil(t, e)
-
-					return nil
-				},
-			)
-
-			os.RemoveAll(out)
-		},
-	)
-
-	return out
-}
-
 func TestCreateCA(t *testing.T) {
 	t.Run(
 		"ErrorFailKeyCreation",
@@ -89,6 +46,7 @@ func TestCreateCA(t *testing.T) {
 			}
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "private"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "private"), 0o500)
 			assert.Nil(t, e)
 
@@ -112,6 +70,7 @@ func TestCreateCA(t *testing.T) {
 			}
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "ca"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "ca"), 0o500)
 			assert.Nil(t, e)
 
@@ -130,17 +89,13 @@ func TestCreateCA(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
-			if runtime.GOOS == "windows" {
-				t.Skip("runtime OS not supported")
-			}
-
 			ca, k, e = p.CreateCA()
 			assert.Nil(t, e)
 			assert.NotNil(t, ca)
 			assert.NotNil(t, k)
 
-			// Ensure not readable
-			e = os.Chmod(p.GetCAFile(), 0o200)
+			// Create empty file
+			_, e = os.Create(p.GetCAFile())
 			assert.Nil(t, e)
 
 			ca, k, e = p.CreateCA()
@@ -166,7 +121,7 @@ func TestCreateCA(t *testing.T) {
 	)
 }
 
-func TestCreateCert(t *testing.T) {
+func TestCreateCertFor(t *testing.T) {
 	type testData struct {
 		certType pki.CertType
 		cn       string
@@ -189,6 +144,77 @@ func TestCreateCert(t *testing.T) {
 	}
 
 	t.Run(
+		"ErrorFailReadExistingCA",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var k *rsa.PrivateKey
+			var p *pki.PKI = setup(t)
+
+			// Create empty file
+			_, e = os.Create(p.GetCAFile())
+			assert.Nil(t, e)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.NotNil(t, e)
+			assert.Nil(t, c)
+			assert.Nil(t, k)
+		},
+	)
+
+	t.Run(
+		"ErrorFailReadExistingKey",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var k *rsa.PrivateKey
+			var p *pki.PKI = setup(t)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			// Make writable
+			e = os.Chmod(p.GetKeyFileFor("example.com"), 0o600)
+			assert.Nil(t, e)
+
+			// Create empty file
+			_, e = os.Create(p.GetKeyFileFor("example.com"))
+			assert.Nil(t, e)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.NotNil(t, e)
+			assert.Nil(t, c)
+			assert.Nil(t, k)
+		},
+	)
+
+	t.Run(
+		"ErrorFailReadExistingCSR",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var k *rsa.PrivateKey
+			var p *pki.PKI = setup(t)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			// Create empty file
+			_, e = os.Create(p.GetCSRFileFor("example.com"))
+			assert.Nil(t, e)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.NotNil(t, e)
+			assert.Nil(t, c)
+			assert.Nil(t, k)
+		},
+	)
+
+	t.Run(
 		"ErrorFailReadExistingCert",
 		func(t *testing.T) {
 			var c *x509.Certificate
@@ -196,17 +222,13 @@ func TestCreateCert(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
-			if runtime.GOOS == "windows" {
-				t.Skip("runtime OS not supported")
-			}
-
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
-			// Ensure not readable
-			e = os.Chmod(p.GetCertFileFor("example.com"), 0o200)
+			// Create empty file
+			_, e = os.Create(p.GetCertFileFor("example.com"))
 			assert.Nil(t, e)
 
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
@@ -282,11 +304,16 @@ func TestCreateCSRFor(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			k, e = p.CreateRSAKeyFor("example.com")
 			assert.Nil(t, e)
 			assert.NotNil(t, k)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "csr"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "csr"), 0o500)
 			assert.Nil(t, e)
 
@@ -323,7 +350,12 @@ func TestCreateRSAKeyFor(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "private"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "private"), 0o500)
 			assert.Nil(t, e)
 
@@ -367,7 +399,12 @@ func TestErase(t *testing.T) {
 			var e error
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			// Ensure not writable
+			defer os.Chmod(p.Root, 0o700)
 			e = os.Chmod(p.Root, 0o500)
 			assert.Nil(t, e)
 
@@ -384,6 +421,91 @@ func TestErase(t *testing.T) {
 
 			e = p.Erase()
 			assert.Nil(t, e)
+		},
+	)
+}
+
+func TestFingerprint(t *testing.T) {
+	t.Run(
+		"ErrorNoCN",
+		func(t *testing.T) {
+			var p *pki.PKI = setup(t)
+
+			assert.Equal(t, "", p.Fingerprint(nil))
+		},
+	)
+
+	t.Run(
+		"Success",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var fp string
+			var hash [sha1.Size]byte
+			var k *rsa.PrivateKey
+			var p *pki.PKI = setup(t)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			hash = sha1.Sum(c.Raw)
+			fp = hex.EncodeToString(hash[:])
+			assert.Equal(t, fp, p.Fingerprint(c))
+		},
+	)
+}
+
+func TestFingerprintFor(t *testing.T) {
+	t.Run(
+		"ErrorNoCN",
+		func(t *testing.T) {
+			var p *pki.PKI = setup(t)
+
+			assert.Equal(t, "", p.FingerprintFor(""))
+		},
+	)
+
+	t.Run(
+		"ErrorFailReadExistingCert",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var k *rsa.PrivateKey
+			var p *pki.PKI = setup(t)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			// Create empty file
+			_, e = os.Create(p.GetCertFileFor("example.com"))
+			assert.Nil(t, e)
+
+			assert.Equal(t, "", p.FingerprintFor("example.com"))
+		},
+	)
+
+	t.Run(
+		"Success",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var fp string
+			var hash [sha1.Size]byte
+			var k *rsa.PrivateKey
+			var p *pki.PKI = setup(t)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			hash = sha1.Sum(c.Raw)
+			fp = hex.EncodeToString(hash[:])
+			assert.Equal(t, fp, p.FingerprintFor("example.com"))
 		},
 	)
 }
@@ -423,6 +545,24 @@ func TestGetFiles(t *testing.T) {
 			},
 		)
 	}
+}
+
+func TestHasCertFor(t *testing.T) {
+	var p *pki.PKI = setup(t)
+
+	assert.Equal(t, false, p.HasCertFor(""))
+}
+
+func TestHasCSR(t *testing.T) {
+	var p *pki.PKI = setup(t)
+
+	assert.Equal(t, false, p.HasCSRFor(""))
+}
+
+func TestHasKeyFor(t *testing.T) {
+	var p *pki.PKI = setup(t)
+
+	assert.Equal(t, false, p.HasKeyFor(""))
 }
 
 func TestHasSigned(t *testing.T) {
@@ -571,6 +711,10 @@ func TestImportCSR(t *testing.T) {
 			var p1 *pki.PKI = setup(t)
 			var p2 *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			k, e = p1.CreateRSAKeyFor("example.com")
 			assert.Nil(t, e)
 			assert.NotNil(t, k)
@@ -580,6 +724,7 @@ func TestImportCSR(t *testing.T) {
 			assert.NotNil(t, csr)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p2.Root, "csr"), 0o700)
 			e = os.Chmod(filepath.Join(p2.Root, "csr"), 0o500)
 			assert.Nil(t, e)
 
@@ -719,11 +864,13 @@ func TestNew(t *testing.T) {
 		func(t *testing.T) {
 			var e error
 			var p *pki.PKI
-			var pkiDir string = tempDir(t)
+			var pkiDir string = t.TempDir()
 			var tmp string = filepath.Join(pkiDir, "nopki")
 
 			// Ensure not writable
-			os.MkdirAll(pkiDir, 0o400)
+			defer os.Chmod(pkiDir, 0o700)
+			e = os.Chmod(pkiDir, 0o500)
+			assert.Nil(t, e)
 
 			p, e = pki.New(tmp, pki.NewCfg())
 			assert.NotNil(t, e)
@@ -737,7 +884,7 @@ func TestNew(t *testing.T) {
 			var e error
 			var p *pki.PKI
 
-			p, e = pki.New(tempDir(t), nil)
+			p, e = pki.New(t.TempDir(), nil)
 			assert.NotNil(t, e)
 			assert.Nil(t, p)
 		},
@@ -748,10 +895,12 @@ func TestNew(t *testing.T) {
 		func(t *testing.T) {
 			var e error
 			var p *pki.PKI
-			var pkiDir string = tempDir(t)
+			var pkiDir string = t.TempDir()
 
 			// Ensure not writable
-			os.MkdirAll(pkiDir, 0o400)
+			defer os.Chmod(pkiDir, 0o700)
+			e = os.Chmod(pkiDir, 0o500)
+			assert.Nil(t, e)
 
 			p, e = pki.New(pkiDir, pki.NewCfg())
 			assert.NotNil(t, e)
@@ -835,12 +984,17 @@ func TestRevokeCertFor(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "certs"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "certs"), 0o500)
 			assert.Nil(t, e)
 
@@ -858,12 +1012,17 @@ func TestRevokeCertFor(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "csr"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "csr"), 0o500)
 			assert.Nil(t, e)
 
@@ -881,12 +1040,17 @@ func TestRevokeCertFor(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "private"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "private"), 0o500)
 			assert.Nil(t, e)
 
@@ -923,7 +1087,12 @@ func TestSync(t *testing.T) {
 			var e error
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			// Ensure not writable
+			defer os.Chmod(p.Root, 0o700)
 			e = os.Chmod(p.Root, 0o500)
 			assert.Nil(t, e)
 
@@ -940,6 +1109,35 @@ func TestSync(t *testing.T) {
 
 			e = p.Sync()
 			assert.Nil(t, e)
+		},
+	)
+
+	t.Run(
+		"ErrorFailReadExistingCA",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var k *rsa.PrivateKey
+			var p1 *pki.PKI = setup(t)
+			var p2 *pki.PKI
+
+			// Create CA
+			c, k, e = p1.CreateCA()
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			// Create empty file
+			_, e = os.Create(p1.GetCAFile())
+			assert.Nil(t, e)
+
+			// Create second PKI instance so p2.ca == nil
+			p2, e = pki.New(p1.Root, pki.NewCfg())
+			assert.Nil(t, e)
+			assert.NotNil(t, p2)
+
+			e = p2.Sync()
+			assert.NotNil(t, e)
 		},
 	)
 
@@ -962,6 +1160,29 @@ func TestSync(t *testing.T) {
 	)
 
 	t.Run(
+		"ErrorFailReadExistingCert",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var k *rsa.PrivateKey
+			var p *pki.PKI = setup(t)
+
+			// Create cert
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			// Create empty file
+			_, e = os.Create(p.GetCertFileFor("example.com"))
+			assert.Nil(t, e)
+
+			e = p.Sync()
+			assert.NotNil(t, e)
+		},
+	)
+
+	t.Run(
 		"Success",
 		func(t *testing.T) {
 			var c *x509.Certificate
@@ -969,10 +1190,28 @@ func TestSync(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
-			c, k, e = p.CreateCertFor("user", pki.ClientCert)
+			p.Cfg.CertDaysValid = -1
+
+			c, k, e = p.CreateCertFor("user1", pki.ClientCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
+
+			p.Cfg.CertDaysValid = 365
+
+			c, k, e = p.CreateCertFor("user2", pki.ClientCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			c, e = p.RevokeCertFor("example.com")
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
 
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
@@ -1000,6 +1239,7 @@ func TestUndo(t *testing.T) {
 			assert.NotNil(t, k)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "index.db"), 0o600)
 			e = os.Chmod(filepath.Join(p.Root, "index.db"), 0o400)
 			assert.Nil(t, e)
 
@@ -1027,17 +1267,13 @@ func TestUndo(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
-			if runtime.GOOS == "windows" {
-				t.Skip("runtime OS not supported")
-			}
-
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
-			// Ensure not readable
-			e = os.Chmod(p.GetCertFileFor("example.com"), 0o200)
+			// Create empty file
+			_, e = os.Create(p.GetCertFileFor("example.com"))
 			assert.Nil(t, e)
 
 			e = p.Undo()
@@ -1053,12 +1289,17 @@ func TestUndo(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "certs"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "certs"), 0o500)
 			assert.Nil(t, e)
 
@@ -1075,12 +1316,17 @@ func TestUndo(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "csr"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "csr"), 0o500)
 			assert.Nil(t, e)
 
@@ -1097,12 +1343,17 @@ func TestUndo(t *testing.T) {
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
+			if runtime.GOOS == "windows" {
+				t.Skip("runtime OS not supported")
+			}
+
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
 			// Ensure not writable
+			defer os.Chmod(filepath.Join(p.Root, "private"), 0o700)
 			e = os.Chmod(filepath.Join(p.Root, "private"), 0o500)
 			assert.Nil(t, e)
 

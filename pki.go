@@ -24,6 +24,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
+	"encoding/hex"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -449,9 +450,42 @@ func (p *PKI) Erase() error {
 		}
 	}
 
+	p.ca = nil
 	p.db.erase()
+	p.key = nil
 
 	return nil
+}
+
+// Fingerprint will return the sha1 hash of the provided Certificate.
+func (p *PKI) Fingerprint(cert *x509.Certificate) string {
+	var hash [sha1.Size]byte
+
+	if cert == nil {
+		return ""
+	}
+
+	hash = sha1.Sum(cert.Raw)
+
+	return hex.EncodeToString(hash[:])
+}
+
+// FingerprintFor will return the sha1 hash of the Certificate for the
+// specified CommonName, should it exist. If the Certificate does not
+// exist or is revoked, it will return empty string.
+func (p *PKI) FingerprintFor(cn string) string {
+	var cert *x509.Certificate
+	var e error
+
+	if !p.HasCertFor(cn) {
+		return ""
+	}
+
+	if cert, e = getCert(p.Root, cn); e != nil {
+		return ""
+	}
+
+	return p.Fingerprint(cert)
 }
 
 // GetCAFile will return the filepath for the CA. There is no
@@ -502,6 +536,10 @@ func (p *PKI) HasCA() bool {
 // exists on disk. It does not validate that the file contains a valid
 // Certificate.
 func (p *PKI) HasCertFor(cn string) bool {
+	if cn == "" {
+		return false
+	}
+
 	return ensureExists("file", p.GetCertFileFor(cn)) == nil
 }
 
@@ -509,6 +547,10 @@ func (p *PKI) HasCertFor(cn string) bool {
 // CommonName already exists. This only checks if the file exists on
 // disk. It does not validate that the file contains a valid CSR.
 func (p *PKI) HasCSRFor(cn string) bool {
+	if cn == "" {
+		return false
+	}
+
 	return ensureExists("file", p.GetCSRFileFor(cn)) == nil
 }
 
@@ -517,6 +559,10 @@ func (p *PKI) HasCSRFor(cn string) bool {
 // exists on disk. It does not validate that the file contains a valid
 // private key.
 func (p *PKI) HasKeyFor(cn string) bool {
+	if cn == "" {
+		return false
+	}
+
 	return ensureExists("file", p.GetKeyFileFor(cn)) == nil
 }
 
@@ -643,15 +689,20 @@ func (p *PKI) Sync() error {
 		return e
 	}
 
-	// Sync CA
-	if p.HasCA() {
-		if cert, _, e = p.CreateCA(); e != nil {
-			return nil
-		}
+	// Nothing to sync
+	if !p.HasCA() {
+		return nil
+	}
 
-		if e = p.syncCert(cert); e != nil {
+	// Sync CA
+	if p.ca == nil {
+		if p.ca, e = getCA(p.Root); e != nil {
 			return e
 		}
+	}
+
+	if e = p.syncCert(p.ca); e != nil {
+		return e
 	}
 
 	// Sync certs and associated keys

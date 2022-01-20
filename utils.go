@@ -22,8 +22,17 @@ func copyTo(root string, dir string, fn string) error {
 	var src string = filepath.Join(root, dir, fn)
 
 	if strings.HasSuffix(fn, ".der") {
+		if e = ensureExists("file", src); e != nil {
+			// Backwards compatibility
+			return nil // Old CertifyMe might not have created these
+		}
+
 		dst = filepath.Join(root, "ders", fn)
 	} else if strings.HasSuffix(fn, ".pem") {
+		if e = ensureExists("file", src); e != nil {
+			return e
+		}
+
 		dst = filepath.Join(root, "pems", fn)
 	}
 
@@ -70,7 +79,11 @@ func deleteCert(root string, cn string) error {
 	}
 
 	for _, file := range files {
-		// Delete file
+		// Delete file, if it exists
+		if e = ensureExists("file", file); e != nil {
+			continue // Ignore error, if file doesn't exist
+		}
+
 		if e = os.Remove(file); e != nil {
 			e = errors.Newf("failed to delete cert %s: %w", file, e)
 			return e
@@ -88,7 +101,11 @@ func deleteCSR(root string, cn string) error {
 	}
 
 	for _, file := range files {
-		// Delete file
+		// Delete file, if it exists
+		if e = ensureExists("file", file); e != nil {
+			continue // Ignore error, if file doesn't exist
+		}
+
 		if e = os.Remove(file); e != nil {
 			return errors.Newf(
 				"failed to delete cert request %s: %w",
@@ -109,7 +126,11 @@ func deleteKey(root string, cn string) error {
 	}
 
 	for _, file := range files {
-		// Delete file
+		// Delete file, if it exists
+		if e = ensureExists("file", file); e != nil {
+			continue // Ignore error, if file doesn't exist
+		}
+
 		if e = os.Remove(file); e != nil {
 			e = errors.Newf("failed to delete key %s: %w", file, e)
 			return e
