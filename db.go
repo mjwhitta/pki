@@ -253,6 +253,8 @@ func (db *database) isRevoked(sn *big.Int) bool {
 	db.mutex.RLock()
 	defer db.mutex.RUnlock()
 
+	db.initialize()
+
 	for _, entry := range db.entries {
 		if entry.sn == tmp {
 			return entry.revoked
