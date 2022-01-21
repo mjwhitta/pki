@@ -144,7 +144,7 @@ func ensureExists(thetype string, fn string) error {
 	if ok, e := pathname.DoesExist(fn); e != nil {
 		return errors.Newf("%s %s not accessible: %w", thetype, fn, e)
 	} else if !ok {
-		return errors.Newf("%s %s not found: %w", thetype, fn, e)
+		return errors.Newf("%s %s not found", thetype, fn)
 	}
 
 	return nil

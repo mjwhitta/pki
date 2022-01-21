@@ -140,7 +140,7 @@ func (db *database) initializeAttr() error {
 	// Create index.db.attr but for now there is no point in reading
 	// this file back in.
 	if ok, e = pathname.DoesExist(tmp); e != nil {
-		return e
+		return errors.Newf("file %s not accessible: %w", tmp, e)
 	} else if !ok {
 		if f, e = os.Create(tmp); e != nil {
 			return errors.Newf("failed to create %s: %w", tmp, e)
@@ -169,7 +169,7 @@ func (db *database) initializeDB() error {
 
 	// Read or create index.db
 	if ok, e = pathname.DoesExist(tmp); e != nil {
-		return e
+		return errors.Newf("file %s not accessible: %w", tmp, e)
 	} else if !ok {
 		if f, e = os.Create(tmp); e != nil {
 			return errors.Newf("failed to create %s: %w", tmp, e)
@@ -213,7 +213,7 @@ func (db *database) initializeSerial() error {
 
 	// Read or create index.db.serial
 	if ok, e = pathname.DoesExist(tmp); e != nil {
-		return e
+		return errors.Newf("file %s not accessible: %w", tmp, e)
 	} else if !ok {
 		if f, e = os.Create(tmp); e != nil {
 			return errors.Newf("failed to create %s: %w", tmp, e)
