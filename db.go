@@ -168,7 +168,7 @@ func (db *database) initializeDB() error {
 	var tmp string = filepath.Join(db.root, "index.db")
 
 	// Reset
-	db.entries = []*CertEntry{}
+	db.entries = []*certEntry{}
 	db.seen = map[string]struct{}{}
 
 	// Read or create index.db
