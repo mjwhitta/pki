@@ -167,6 +167,10 @@ func (db *database) initializeDB() error {
 	var ok bool
 	var tmp string = filepath.Join(db.root, "index.db")
 
+	// Reset
+	db.entries = []*CertEntry{}
+	db.seen = map[string]struct{}{}
+
 	// Read or create index.db
 	if ok, e = pathname.DoesExist(tmp); e != nil {
 		return errors.Newf("file %s not accessible: %w", tmp, e)
