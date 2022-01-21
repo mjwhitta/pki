@@ -27,6 +27,7 @@ func setup(t *testing.T, dirs ...string) *pki.PKI {
 	assert.Nil(t, e)
 	assert.NotNil(t, p)
 
+	p.Cfg.Country("US")
 	p.KeySize = 1024
 
 	return p

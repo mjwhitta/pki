@@ -217,18 +217,35 @@ func (cfg *Cfg) String() string {
 
 // Subject will return the constructed Subject.
 func (cfg *Cfg) Subject(cn ...string) pkix.Name {
+	var name pkix.Name
+
 	if len(cn) == 0 {
 		cn = append(cn, cfg.subject["CN"])
 	}
 
-	return pkix.Name{
-		CommonName:         cn[0],
-		Country:            []string{cfg.subject["C"]},
-		Locality:           []string{cfg.subject["L"]},
-		Organization:       []string{cfg.subject["O"]},
-		OrganizationalUnit: []string{cfg.subject["OU"]},
-		Province:           []string{cfg.subject["ST"]},
+	name = pkix.Name{CommonName: cn[0]}
+
+	if cfg.subject["C"] != "" {
+		name.Country = []string{cfg.subject["C"]}
 	}
+
+	if cfg.subject["L"] != "" {
+		name.Locality = []string{cfg.subject["L"]}
+	}
+
+	if cfg.subject["O"] != "" {
+		name.Organization = []string{cfg.subject["O"]}
+	}
+
+	if cfg.subject["OU"] != "" {
+		name.OrganizationalUnit = []string{cfg.subject["OU"]}
+	}
+
+	if cfg.subject["ST"] != "" {
+		name.Province = []string{cfg.subject["ST"]}
+	}
+
+	return name
 }
 
 // Unit is an alias for OrganizationalUnit().

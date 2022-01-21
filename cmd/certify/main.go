@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"gitlab.com/mjwhitta/cli"
 	"gitlab.com/mjwhitta/errors"
@@ -69,6 +71,7 @@ func main() {
 		}
 	}()
 
+	var ans string
 	var c *pki.Cfg
 	var e error
 	var p *pki.PKI
@@ -96,9 +99,15 @@ func main() {
 	}
 
 	if flags.erase {
-		log.Warn("Erasing PKI")
-		if e = p.Erase(); e != nil {
-			panic(errors.Newf("failed to erase PKI: %w", e))
+		hl.PrintYellow("Erase PKI (y/N)? ")
+		fmt.Scanln(&ans)
+
+		switch strings.TrimSpace(strings.ToLower(ans)) {
+		case "y", "yes":
+			log.Warn("Erasing PKI")
+			if e = p.Erase(); e != nil {
+				panic(errors.Newf("failed to erase PKI: %w", e))
+			}
 		}
 
 		os.Exit(Good) // Exit so as not to sync

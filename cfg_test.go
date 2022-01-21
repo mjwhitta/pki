@@ -154,14 +154,7 @@ func TestSubject(t *testing.T) {
 		"DefaultSubject",
 		func(t *testing.T) {
 			var c *pki.Cfg = pki.NewCfg()
-			var expected = pkix.Name{
-				CommonName:         "Self-signed CA",
-				Country:            []string{""},
-				Locality:           []string{""},
-				Organization:       []string{""},
-				OrganizationalUnit: []string{""},
-				Province:           []string{""},
-			}
+			var expected = pkix.Name{CommonName: "Self-signed CA"}
 
 			assert.Equal(t, expected, c.Subject())
 		},
@@ -195,14 +188,7 @@ func TestSubject(t *testing.T) {
 		"OverrideCNInSubject",
 		func(t *testing.T) {
 			var c *pki.Cfg = pki.NewCfg()
-			var expected = pkix.Name{
-				CommonName:         "CN",
-				Country:            []string{""},
-				Locality:           []string{""},
-				Organization:       []string{""},
-				OrganizationalUnit: []string{""},
-				Province:           []string{""},
-			}
+			var expected = pkix.Name{CommonName: "CN"}
 
 			assert.Equal(t, expected, c.Subject("CN"))
 		},

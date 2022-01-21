@@ -141,6 +141,14 @@ func init() {
 
 // Process cli flags and ensure no issues
 func validate() {
+	var actions = []bool{
+		flags.erase,
+		flags.revoke,
+		flags.sample,
+		flags.undo,
+	}
+	var tmp int
+
 	hl.Disable(flags.nocolor)
 
 	// Normalized cfg
@@ -153,20 +161,21 @@ func validate() {
 		}
 	}
 
-	// Sample and undo must be used alone
-	if flags.sample || flags.undo {
-		if flags.sample && flags.undo {
-			cli.Usage(InvalidOption)
-		} else if (len(flags.csr) > 0) || flags.revoke {
-			cli.Usage(InvalidOption)
-		} else if (len(flags.clients) + cli.NArg()) > 0 {
-			cli.Usage(ExtraArgument)
+	// Can only specify one action, and no CSRs if any action
+	for _, action := range actions {
+		if action {
+			tmp++
 		}
 	}
-
-	// CSR and revoke can not be used together
-	if (len(flags.csr) > 0) && flags.revoke {
+	if ((tmp > 0) && (len(flags.csr) > 0)) || (tmp > 1) {
 		cli.Usage(InvalidOption)
+	}
+
+	// No clients or servers, if one of these actions
+	if flags.erase || flags.sample || flags.undo {
+		if (len(flags.clients) + cli.NArg()) > 0 {
+			cli.Usage(ExtraArgument)
+		}
 	}
 
 	// Short circuit if version was requested
