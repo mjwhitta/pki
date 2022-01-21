@@ -60,11 +60,17 @@ func newDatabase(root string) (*database, error) {
 
 // add will store the cert in the PKI db.
 func (db *database) add(cert *x509.Certificate) error {
+	var e error
 	var entry *certEntry = newEntry(cert)
 
 	// Lock while adding
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
+
+	// Sync with files on disk
+	if e = db.initialize(); e != nil {
+		return e
+	}
 
 	// Do not allow duplicate serial numbers
 	if _, ok := db.seen[entry.sn]; ok {
@@ -104,6 +110,9 @@ func (db *database) getEntries() []certEntry {
 
 	db.mutex.RLock()
 	defer db.mutex.RUnlock()
+
+	// Sync with files on disk
+	db.initialize()
 
 	for _, entry := range db.entries {
 		entries = append(entries, *entry)
@@ -166,6 +175,10 @@ func (db *database) initializeDB() error {
 	var f *os.File
 	var ok bool
 	var tmp string = filepath.Join(db.root, "index.db")
+
+	// Reset
+	db.entries = []*certEntry{}
+	db.seen = map[string]struct{}{}
 
 	// Read or create index.db
 	if ok, e = pathname.DoesExist(tmp); e != nil {
@@ -253,6 +266,9 @@ func (db *database) isRevoked(sn *big.Int) bool {
 	db.mutex.RLock()
 	defer db.mutex.RUnlock()
 
+	// Sync with files on disk
+	db.initialize()
+
 	for _, entry := range db.entries {
 		if entry.sn == tmp {
 			return entry.revoked
@@ -265,6 +281,12 @@ func (db *database) isRevoked(sn *big.Int) bool {
 // nextSerialNumber will return the next available serial number that
 // has not been used.
 func (db *database) nextSerialNumber() *big.Int {
+	db.mutex.RLock()
+	defer db.mutex.RUnlock()
+
+	// Sync with files on diak
+	db.initialize()
+
 	return db.serialNumber
 }
 
@@ -276,6 +298,11 @@ func (db *database) revoke(sn *big.Int) error {
 
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
+
+	// Sync with files on disk
+	if e = db.initialize(); e != nil {
+		return e
+	}
 
 	for _, entry := range db.entries {
 		if entry.sn == tmp {
@@ -299,6 +326,11 @@ func (db *database) undo() (string, error) {
 	// Lock while removing
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
+
+	// Sync with files on disk
+	if e = db.initialize(); e != nil {
+		return "", e
+	}
 
 	// Return, if no entries to remove
 	if len(db.entries) == 0 {
