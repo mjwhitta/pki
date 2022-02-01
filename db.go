@@ -25,20 +25,14 @@ type database struct {
 	serialNumber *big.Int
 }
 
+type transaction func() error
+
 // newDatabase will return a pointer to a new database instance.
 func newDatabase(root string) (*database, error) {
 	var db *database
-	var e error
-	var sn *big.Int
 
 	// Check that root exists
-	if e = ensureExists("dir", root); e != nil {
-		return nil, e
-	}
-
-	// Generate serial number
-	if sn, e = rand.Int(rand.Reader, big.NewInt(65535)); e != nil {
-		e = errors.Newf("failed to generate serial number: %w", e)
+	if e := ensureExists("dir", root); e != nil {
 		return nil, e
 	}
 
@@ -47,12 +41,7 @@ func newDatabase(root string) (*database, error) {
 		mutex:        &sync.RWMutex{},
 		root:         root,
 		seen:         map[string]struct{}{},
-		serialNumber: sn,
-	}
-
-	// Initialize the db
-	if e = db.initialize(); e != nil {
-		return nil, e
+		serialNumber: big.NewInt(0),
 	}
 
 	return db, nil
@@ -60,44 +49,68 @@ func newDatabase(root string) (*database, error) {
 
 // add will store the cert in the PKI db.
 func (db *database) add(cert *x509.Certificate) error {
-	var e error
-	var entry *certEntry = newEntry(cert)
+	return db.commit(
+		true,
+		func() error {
+			var entry *certEntry = newEntry(cert)
 
-	// Lock while adding
-	db.mutex.Lock()
-	defer db.mutex.Unlock()
+			// Do not allow duplicate serial numbers
+			if _, ok := db.seen[entry.sn]; ok {
+				return errors.Newf(
+					"cert with serial number %s already exists",
+					entry.sn,
+				)
+			}
 
-	// Sync with files on disk
-	if e = db.initialize(); e != nil {
+			// Add
+			db.entries = append(db.entries, entry)
+			db.seen[entry.sn] = struct{}{}
+
+			// Increment db serial number
+			db.serialNumber.Add(cert.SerialNumber, big.NewInt(1))
+
+			return nil
+		},
+	)
+}
+
+// commit will write/read lock the db, then it will run the provided
+// transaction.
+func (db *database) commit(wLock bool, t transaction) error {
+	if wLock {
+		// Acquire write lock
+		db.mutex.Lock()
+		defer db.mutex.Unlock()
+	} else {
+		// Acquire read lock
+		db.mutex.RLock()
+		defer db.mutex.RUnlock()
+	}
+
+	// Sync from files on disk
+	if e := db.initialize(); e != nil {
 		return e
 	}
 
-	// Do not allow duplicate serial numbers
-	if _, ok := db.seen[entry.sn]; ok {
-		return errors.Newf(
-			"certificate with serial number %s already exists",
-			entry.sn,
-		)
+	// Run transaction
+	if e := t(); e != nil {
+		return e
 	}
 
-	// Add
-	db.entries = append(db.entries, entry)
-	db.seen[entry.sn] = struct{}{}
+	// Sync to files on disk
+	if e := db.update(); e != nil {
+		return e
+	}
 
-	// Increment db serial number
-	db.serialNumber.Add(cert.SerialNumber, big.NewInt(1))
-
-	// Update files on disk
-	return db.update()
+	return nil
 }
 
 // erase will erase all files related to the PKI db.
 func (db *database) erase() error {
-	var e error
 	var rms = []string{"index.db", "index.db.attr", "index.db.serial"}
 
 	for _, rm := range rms {
-		if e = os.RemoveAll(filepath.Join(db.root, rm)); e != nil {
+		if e := os.RemoveAll(filepath.Join(db.root, rm)); e != nil {
 			return errors.Newf("failed to remove %s: %w", rm, e)
 		}
 	}
@@ -105,20 +118,21 @@ func (db *database) erase() error {
 	return nil
 }
 
-func (db *database) getEntries() []certEntry {
+func (db *database) getEntries() ([]certEntry, error) {
 	var entries []certEntry
+	var t transaction = func() error {
+		for _, entry := range db.entries {
+			entries = append(entries, *entry)
+		}
 
-	db.mutex.RLock()
-	defer db.mutex.RUnlock()
-
-	// Sync with files on disk
-	db.initialize()
-
-	for _, entry := range db.entries {
-		entries = append(entries, *entry)
+		return nil
 	}
 
-	return entries
+	if e := db.commit(false, t); e != nil {
+		return nil, e
+	}
+
+	return entries, nil
 }
 
 // initialize will create the db if it's missing, otherwise it will
@@ -141,14 +155,12 @@ func (db *database) initialize() error {
 
 // initializeAttr will create index.db.attr if it's missing.
 func (db *database) initializeAttr() error {
-	var e error
 	var f *os.File
-	var ok bool
 	var tmp string = filepath.Join(db.root, "index.db.attr")
 
 	// Create index.db.attr but for now there is no point in reading
 	// this file back in.
-	if ok, e = pathname.DoesExist(tmp); e != nil {
+	if ok, e := pathname.DoesExist(tmp); e != nil {
 		return errors.Newf("file %s not accessible: %w", tmp, e)
 	} else if !ok {
 		if f, e = os.Create(tmp); e != nil {
@@ -228,6 +240,13 @@ func (db *database) initializeSerial() error {
 	if ok, e = pathname.DoesExist(tmp); e != nil {
 		return errors.Newf("file %s not accessible: %w", tmp, e)
 	} else if !ok {
+		// Generate serial number
+		db.serialNumber, e = rand.Int(rand.Reader, big.NewInt(65535))
+		if e != nil {
+			e = errors.Newf("failed to generate serial number: %w", e)
+			return e
+		}
+
 		if f, e = os.Create(tmp); e != nil {
 			return errors.Newf("failed to create %s: %w", tmp, e)
 		}
@@ -260,99 +279,96 @@ func (db *database) initializeSerial() error {
 
 // isRevoked will return whether or not the cert with the specified
 // serial number has been revoked.
-func (db *database) isRevoked(sn *big.Int) bool {
-	var tmp string = hex.EncodeToString(sn.Bytes())
+func (db *database) isRevoked(sn *big.Int) (bool, error) {
+	var revoked bool
+	var t transaction = func() error {
+		var tmp string = hex.EncodeToString(sn.Bytes())
 
-	db.mutex.RLock()
-	defer db.mutex.RUnlock()
-
-	// Sync with files on disk
-	db.initialize()
-
-	for _, entry := range db.entries {
-		if entry.sn == tmp {
-			return entry.revoked
+		for _, entry := range db.entries {
+			if entry.sn == tmp {
+				revoked = entry.revoked
+				return nil
+			}
 		}
+
+		return nil
 	}
 
-	return false
+	if e := db.commit(false, t); e != nil {
+		return false, e
+	}
+
+	return revoked, nil
 }
 
 // nextSerialNumber will return the next available serial number that
 // has not been used.
-func (db *database) nextSerialNumber() *big.Int {
-	db.mutex.RLock()
-	defer db.mutex.RUnlock()
+func (db *database) nextSerialNumber() (*big.Int, error) {
+	var sn *big.Int = big.NewInt(0)
+	var t transaction = func() error {
+		sn.SetBytes(db.serialNumber.Bytes())
+		return nil
+	}
 
-	// Sync with files on diak
-	db.initialize()
+	if e := db.commit(false, t); e != nil {
+		return nil, e
+	}
 
-	return db.serialNumber
+	return sn, nil
 }
 
 // revoke will update the PKI db to reflect that the cert with the
 // specified serial number is revoked.
 func (db *database) revoke(sn *big.Int) error {
-	var e error
-	var tmp string = hex.EncodeToString(sn.Bytes())
+	return db.commit(
+		true,
+		func() error {
+			var tmp string = hex.EncodeToString(sn.Bytes())
 
-	db.mutex.Lock()
-	defer db.mutex.Unlock()
-
-	// Sync with files on disk
-	if e = db.initialize(); e != nil {
-		return e
-	}
-
-	for _, entry := range db.entries {
-		if entry.sn == tmp {
-			if e = entry.revoke(); e != nil {
-				return e
+			for _, entry := range db.entries {
+				if entry.sn == tmp {
+					return entry.revoke()
+				}
 			}
 
-			// Update files on disk
-			return db.update()
-		}
-	}
-
-	return errors.Newf("cert with serial number %s not found", tmp)
+			return errors.Newf(
+				"cert with serial number %s not found",
+				tmp,
+			)
+		},
+	)
 }
 
 // undo will delete the previous entry in the PKI db.
 func (db *database) undo() (string, error) {
-	var e error
-	var entry *certEntry
+	var cn string
+	var t transaction = func() error {
+		var entry *certEntry
 
-	// Lock while removing
-	db.mutex.Lock()
-	defer db.mutex.Unlock()
+		// Return, if no entries to remove
+		if len(db.entries) == 0 {
+			return nil
+		}
 
-	// Sync with files on disk
-	if e = db.initialize(); e != nil {
+		// Get most recent entry
+		entry = db.entries[len(db.entries)-1]
+		cn = entry.cn
+
+		// Delete
+		db.entries = db.entries[:len(db.entries)-1]
+		delete(db.seen, entry.sn)
+
+		// Rollback serial number
+		db.serialNumber.Sub(db.serialNumber, big.NewInt(1))
+
+		return nil
+	}
+
+	if e := db.commit(true, t); e != nil {
 		return "", e
 	}
 
-	// Return, if no entries to remove
-	if len(db.entries) == 0 {
-		return "", nil
-	}
-
-	// Get most recent entry
-	entry = db.entries[len(db.entries)-1]
-
-	// Delete
-	db.entries = db.entries[:len(db.entries)-1]
-	delete(db.seen, entry.sn)
-
-	// Rollback serial number
-	db.serialNumber.Sub(db.serialNumber, big.NewInt(1))
-
-	// Update files on disk
-	if e = db.update(); e != nil {
-		return "", e
-	}
-
-	return entry.cn, nil
+	return cn, nil
 }
 
 func (db *database) update() error {

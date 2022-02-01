@@ -15,4 +15,4 @@ var roFilePerms os.FileMode = os.ModePerm & 0o400
 var rwFilePerms os.FileMode = os.ModePerm & 0o600
 
 // Version is the package version.
-const Version = "1.1.4"
+const Version = "1.2.0"

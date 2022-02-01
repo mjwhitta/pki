@@ -230,7 +230,9 @@ func (p *PKI) createCert(
 			}
 
 			// Get serial number from db
-			sn = p.db.nextSerialNumber()
+			if sn, e = p.db.nextSerialNumber(); e != nil {
+				return nil, e
+			}
 
 			usage |= x509.KeyUsageContentCommitment // Non Repudiation
 			usage |= x509.KeyUsageDigitalSignature
@@ -241,7 +243,9 @@ func (p *PKI) createCert(
 			extUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 
 			// Get serial number from db
-			sn = p.db.nextSerialNumber()
+			if sn, e = p.db.nextSerialNumber(); e != nil {
+				return nil, e
+			}
 
 			usage |= x509.KeyUsageDigitalSignature
 			usage |= x509.KeyUsageKeyEncipherment
@@ -639,7 +643,7 @@ func (p *PKI) IsExpired(cert *x509.Certificate) bool {
 // IsRevoked will return whether or not the specified Certificate has
 // been revoked. This takes a Certificate b/c a CommonName is not
 // enough info with "unique_subject = no".
-func (p *PKI) IsRevoked(cert *x509.Certificate) bool {
+func (p *PKI) IsRevoked(cert *x509.Certificate) (bool, error) {
 	return p.db.isRevoked(cert.SerialNumber)
 }
 
@@ -683,6 +687,7 @@ func (p *PKI) RevokeCertFor(cn string) (*x509.Certificate, error) {
 func (p *PKI) Sync() error {
 	var cert *x509.Certificate
 	var e error
+	var entries []certEntry
 
 	// Reset ders/pems subdirectories
 	if e = p.unsync(); e != nil {
@@ -706,7 +711,11 @@ func (p *PKI) Sync() error {
 	}
 
 	// Sync certs and associated keys
-	for _, ce := range p.db.getEntries() {
+	if entries, e = p.db.getEntries(); e != nil {
+		return e
+	}
+
+	for _, ce := range entries {
 		// Skip expired and revoked certs
 		if ce.expired || ce.revoked {
 			continue

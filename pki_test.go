@@ -826,7 +826,12 @@ func TestIsRevoked(t *testing.T) {
 		t.Run(
 			test,
 			func(t *testing.T) {
-				assert.Equal(t, data.expected, p.IsRevoked(data.cert))
+				var e error
+				var revoked bool
+
+				revoked, e = p.IsRevoked(data.cert)
+				assert.Nil(t, e)
+				assert.Equal(t, data.expected, revoked)
 			},
 		)
 	}
@@ -886,24 +891,6 @@ func TestNew(t *testing.T) {
 			var p *pki.PKI
 
 			p, e = pki.New(t.TempDir(), nil)
-			assert.NotNil(t, e)
-			assert.Nil(t, p)
-		},
-	)
-
-	t.Run(
-		"ErrorFailDBCreation",
-		func(t *testing.T) {
-			var e error
-			var p *pki.PKI
-			var pkiDir string = t.TempDir()
-
-			// Ensure not writable
-			defer os.Chmod(pkiDir, 0o700)
-			e = os.Chmod(pkiDir, 0o500)
-			assert.Nil(t, e)
-
-			p, e = pki.New(pkiDir, pki.NewCfg())
 			assert.NotNil(t, e)
 			assert.Nil(t, p)
 		},
