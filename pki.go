@@ -675,9 +675,11 @@ func (p *PKI) RevokeCertFor(cn string) (*x509.Certificate, error) {
 		return nil, e
 	} else if e = deleteCSR(p.Root, cn); e != nil {
 		return nil, e
-	} else if e = deleteKey(p.Root, cn); e != nil {
-		return nil, e
 	}
+
+	// Don't throw error here b/c CSR may have been imported, thus no
+	// private key exists in PKI
+	deleteKey(p.Root, cn)
 
 	return cert, nil
 }
