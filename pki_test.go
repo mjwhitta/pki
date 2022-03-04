@@ -1021,34 +1021,6 @@ func TestRevokeCertFor(t *testing.T) {
 	)
 
 	t.Run(
-		"ErrorFailDeleteKey",
-		func(t *testing.T) {
-			var c *x509.Certificate
-			var e error
-			var k *rsa.PrivateKey
-			var p *pki.PKI = setup(t)
-
-			if runtime.GOOS == "windows" {
-				t.Skip("runtime OS not supported")
-			}
-
-			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
-			assert.Nil(t, e)
-			assert.NotNil(t, c)
-			assert.NotNil(t, k)
-
-			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "private"), 0o700)
-			e = os.Chmod(filepath.Join(p.Root, "private"), 0o500)
-			assert.Nil(t, e)
-
-			c, e = p.RevokeCertFor("example.com")
-			assert.NotNil(t, e)
-			assert.Nil(t, c)
-		},
-	)
-
-	t.Run(
 		"Success",
 		func(t *testing.T) {
 			var c *x509.Certificate
