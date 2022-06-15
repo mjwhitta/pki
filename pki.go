@@ -144,7 +144,7 @@ func (p *PKI) CreateCertFor(
 		return nil, nil, e
 	}
 
-	// Use existing cert request, if found, otherwise create
+	// Use existing cert, if found, otherwise create
 	cert, e = p.createOrGetCert(cn, csr, csr.PublicKey, certType)
 	if e != nil {
 		return nil, nil, e
@@ -347,7 +347,7 @@ func (p *PKI) createOrGetCert(
 
 	// Use existing cert, if found
 	if p.HasCertFor(cn) {
-		if cert, e = getCert(p.Root, cn); e != nil {
+		if cert, e = p.db.getCertFor(cn, true); e != nil {
 			return nil, e
 		}
 	}
@@ -485,7 +485,7 @@ func (p *PKI) FingerprintFor(cn string) string {
 		return ""
 	}
 
-	if cert, e = getCert(p.Root, cn); e != nil {
+	if cert, e = p.db.getCertFor(cn, true); e != nil {
 		return ""
 	}
 
@@ -542,9 +542,11 @@ func (p *PKI) HasCA() bool {
 func (p *PKI) HasCertFor(cn string) bool {
 	if cn == "" {
 		return false
+	} else if _, e := p.db.getEntry(cn); e != nil {
+		return false
 	}
 
-	return ensureExists("file", p.GetCertFileFor(cn)) == nil
+	return true
 }
 
 // HasCSRFor will return whether or not a CSR for the specified
@@ -647,8 +649,31 @@ func (p *PKI) IsRevoked(cert *x509.Certificate) (bool, error) {
 	return p.db.isRevoked(cert.SerialNumber)
 }
 
-// RevokeCertFor will revoke the Certificate with the specified
-// CommonName and return it for any post-processing, such has manually
+// RevokeCert will revoke the provided Certificate.
+func (p *PKI) RevokeCert(cert *x509.Certificate) error {
+	var cn string
+	var e error
+
+	if cert == nil {
+		return errNoCert
+	}
+
+	// Revoke cert
+	if cn, e = p.db.revokeSN(cert.SerialNumber); e != nil {
+		return e
+	}
+
+	// Delete files, but don't throw error here b/c files may have
+	// been manually deleted.
+	deleteCert(p.Root, cn)
+	deleteCSR(p.Root, cn)
+	deleteKey(p.Root, cn)
+
+	return nil
+}
+
+// RevokeCertFor will revoke the oldest Certificate with the specified
+// CommonName and return it for any post-processing, such as manually
 // maintaining a Certificate Revocation List (CRL).
 func (p *PKI) RevokeCertFor(cn string) (*x509.Certificate, error) {
 	var cert *x509.Certificate
@@ -658,27 +683,15 @@ func (p *PKI) RevokeCertFor(cn string) (*x509.Certificate, error) {
 		return nil, errNoCN
 	}
 
-	// Read cert
-	if cert, e = getCert(p.Root, cn); e != nil {
-		return nil, e
-	} else if cert == nil {
-		return nil, errors.Newf("cert for %s not found", cn)
-	}
-
 	// Revoke cert
-	if e = p.db.revoke(cert.SerialNumber); e != nil {
+	if cert, e = p.db.revokeCN(cn); e != nil {
 		return nil, e
 	}
 
-	// Delete files
-	if e = deleteCert(p.Root, cn); e != nil {
-		return nil, e
-	} else if e = deleteCSR(p.Root, cn); e != nil {
-		return nil, e
-	}
-
-	// Don't throw error here b/c CSR may have been imported, thus no
-	// private key exists in PKI
+	// Delete files, but don't throw error here b/c files may have
+	// been manually deleted.
+	deleteCert(p.Root, cn)
+	deleteCSR(p.Root, cn)
 	deleteKey(p.Root, cn)
 
 	return cert, nil
@@ -689,7 +702,7 @@ func (p *PKI) RevokeCertFor(cn string) (*x509.Certificate, error) {
 func (p *PKI) Sync() error {
 	var cert *x509.Certificate
 	var e error
-	var entries []certEntry
+	var entries []*certEntry
 
 	// Reset ders/pems subdirectories
 	if e = p.unsync(); e != nil {
@@ -723,8 +736,13 @@ func (p *PKI) Sync() error {
 			continue
 		}
 
+		// Skip certs that are not tracked
+		if ce.file == "unknown" {
+			continue
+		}
+
 		// Read cert
-		if cert, e = getCert(p.Root, ce.cn); e != nil {
+		if cert, e = p.db.getCertFor(ce.cn, false); e != nil {
 			return e
 		}
 
@@ -807,7 +825,6 @@ func (p *PKI) syncCert(cert *x509.Certificate) error {
 // Undo will rollback the PKI database and delete the most recently
 // generated Certificate and its associated CSR and private key.
 func (p *PKI) Undo() error {
-	var cert *x509.Certificate
 	var cn string
 	var e error
 
@@ -819,19 +836,14 @@ func (p *PKI) Undo() error {
 		return errors.New("no entries to rollback")
 	}
 
-	// Read cert
-	if cert, e = getCert(p.Root, cn); e != nil {
-		return e
-	} else if cert == nil {
-		return errors.Newf("cert for %s not found", cn)
-	}
-
 	// Delete files
-	if e = deleteCert(p.Root, cn); e != nil {
-		return e
-	} else if e = deleteCSR(p.Root, cn); e != nil {
-		return e
-	} else if p.HasKeyFor(cn) {
+	deleteCert(p.Root, cn)
+	if p.HasCSRFor(cn) {
+		if e = deleteCSR(p.Root, cn); e != nil {
+			return e
+		}
+	}
+	if p.HasKeyFor(cn) {
 		if e = deleteKey(p.Root, cn); e != nil {
 			return e
 		}

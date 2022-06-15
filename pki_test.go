@@ -937,6 +937,56 @@ func TestNew(t *testing.T) {
 	)
 }
 
+func TestRevokeCert(t *testing.T) {
+	t.Run(
+		"ErrorNoCert",
+		func(t *testing.T) {
+			var e error
+			var p *pki.PKI = setup(t)
+
+			e = p.RevokeCert(nil)
+			assert.NotNil(t, e)
+		},
+	)
+
+	t.Run(
+		"ErrorFailCertNotFound",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var k *rsa.PrivateKey
+			var p1 *pki.PKI = setup(t)
+			var p2 *pki.PKI = setup(t)
+
+			c, k, e = p1.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			e = p2.RevokeCert(c)
+			assert.NotNil(t, e)
+		},
+	)
+
+	t.Run(
+		"Success",
+		func(t *testing.T) {
+			var c *x509.Certificate
+			var e error
+			var k *rsa.PrivateKey
+			var p *pki.PKI = setup(t)
+
+			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+			assert.Nil(t, e)
+			assert.NotNil(t, c)
+			assert.NotNil(t, k)
+
+			e = p.RevokeCert(c)
+			assert.Nil(t, e)
+		},
+	)
+}
+
 func TestRevokeCertFor(t *testing.T) {
 	t.Run(
 		"ErrorNoCN",
@@ -965,57 +1015,23 @@ func TestRevokeCertFor(t *testing.T) {
 	)
 
 	t.Run(
-		"ErrorFailDeleteCert",
+		"ErrorMissing",
 		func(t *testing.T) {
 			var c *x509.Certificate
 			var e error
 			var k *rsa.PrivateKey
 			var p *pki.PKI = setup(t)
 
-			if runtime.GOOS == "windows" {
-				t.Skip("runtime OS not supported")
-			}
-
 			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
 			assert.NotNil(t, c)
 			assert.NotNil(t, k)
 
-			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "certs"), 0o700)
-			e = os.Chmod(filepath.Join(p.Root, "certs"), 0o500)
-			assert.Nil(t, e)
+			// Delete cert on disk
+			os.Remove(p.GetCertFileFor("example.com"))
 
 			c, e = p.RevokeCertFor("example.com")
-			assert.NotNil(t, e)
-			assert.Nil(t, c)
-		},
-	)
-
-	t.Run(
-		"ErrorFailDeleteCSR",
-		func(t *testing.T) {
-			var c *x509.Certificate
-			var e error
-			var k *rsa.PrivateKey
-			var p *pki.PKI = setup(t)
-
-			if runtime.GOOS == "windows" {
-				t.Skip("runtime OS not supported")
-			}
-
-			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
 			assert.Nil(t, e)
-			assert.NotNil(t, c)
-			assert.NotNil(t, k)
-
-			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "csr"), 0o700)
-			e = os.Chmod(filepath.Join(p.Root, "csr"), 0o500)
-			assert.Nil(t, e)
-
-			c, e = p.RevokeCertFor("example.com")
-			assert.NotNil(t, e)
 			assert.Nil(t, c)
 		},
 	)
@@ -1120,29 +1136,6 @@ func TestSync(t *testing.T) {
 	)
 
 	t.Run(
-		"ErrorFailReadExistingCert",
-		func(t *testing.T) {
-			var c *x509.Certificate
-			var e error
-			var k *rsa.PrivateKey
-			var p *pki.PKI = setup(t)
-
-			// Create cert
-			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
-			assert.Nil(t, e)
-			assert.NotNil(t, c)
-			assert.NotNil(t, k)
-
-			// Create empty file
-			_, e = os.Create(p.GetCertFileFor("example.com"))
-			assert.Nil(t, e)
-
-			e = p.Sync()
-			assert.NotNil(t, e)
-		},
-	)
-
-	t.Run(
 		"Success",
 		func(t *testing.T) {
 			var c *x509.Certificate
@@ -1213,55 +1206,6 @@ func TestUndo(t *testing.T) {
 		func(t *testing.T) {
 			var e error
 			var p *pki.PKI = setup(t)
-
-			e = p.Undo()
-			assert.NotNil(t, e)
-		},
-	)
-
-	t.Run(
-		"ErrorFailReadExistingCert",
-		func(t *testing.T) {
-			var c *x509.Certificate
-			var e error
-			var k *rsa.PrivateKey
-			var p *pki.PKI = setup(t)
-
-			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
-			assert.Nil(t, e)
-			assert.NotNil(t, c)
-			assert.NotNil(t, k)
-
-			// Create empty file
-			_, e = os.Create(p.GetCertFileFor("example.com"))
-			assert.Nil(t, e)
-
-			e = p.Undo()
-			assert.NotNil(t, e)
-		},
-	)
-
-	t.Run(
-		"ErrorFailDeleteCert",
-		func(t *testing.T) {
-			var c *x509.Certificate
-			var e error
-			var k *rsa.PrivateKey
-			var p *pki.PKI = setup(t)
-
-			if runtime.GOOS == "windows" {
-				t.Skip("runtime OS not supported")
-			}
-
-			c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
-			assert.Nil(t, e)
-			assert.NotNil(t, c)
-			assert.NotNil(t, k)
-
-			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "certs"), 0o700)
-			e = os.Chmod(filepath.Join(p.Root, "certs"), 0o500)
-			assert.Nil(t, e)
 
 			e = p.Undo()
 			assert.NotNil(t, e)

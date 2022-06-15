@@ -118,13 +118,30 @@ func (db *database) erase() error {
 	return nil
 }
 
-func (db *database) getEntries() ([]certEntry, error) {
-	var entries []certEntry
-	var t transaction = func() error {
-		for _, entry := range db.entries {
-			entries = append(entries, *entry)
+func (db *database) getCertFor(
+	cn string,
+	validate bool,
+) (*x509.Certificate, error) {
+	var e error
+	var entry *certEntry
+
+	if validate {
+		if entry, e = db.getEntry(cn); e != nil {
+			return nil, e
 		}
 
+		if entry.file == "unknown" {
+			return nil, errors.Newf("cert for %s is missing", cn)
+		}
+	}
+
+	return getCert(db.root, cn)
+}
+
+func (db *database) getEntries() ([]*certEntry, error) {
+	var entries []*certEntry
+	var t transaction = func() error {
+		entries = append(entries, db.entries...)
 		return nil
 	}
 
@@ -133,6 +150,26 @@ func (db *database) getEntries() ([]certEntry, error) {
 	}
 
 	return entries, nil
+}
+
+func (db *database) getEntry(cn string) (*certEntry, error) {
+	var c *certEntry
+	var t transaction = func() error {
+		for _, entry := range db.entries {
+			if (entry.cn == cn) && !entry.revoked {
+				c = entry
+				return nil
+			}
+		}
+
+		return errors.Newf("cert for %s not found", cn)
+	}
+
+	if e := db.commit(false, t); e != nil {
+		return nil, e
+	}
+
+	return c, nil
 }
 
 // initialize will create the db if it's missing, otherwise it will
@@ -182,6 +219,7 @@ func (db *database) initializeAttr() error {
 // will read it in.
 func (db *database) initializeDB() error {
 	var b []byte
+	var c *x509.Certificate
 	var e error
 	var entry *certEntry
 	var f *os.File
@@ -217,6 +255,18 @@ func (db *database) initializeDB() error {
 
 			if entry, e = parseEntry(line); e != nil {
 				return errors.Newf("invalid db entry: %w", e)
+			}
+
+			if c, e = getCert(db.root, entry.cn); e != nil {
+				entry.file = "unknown"
+			} else if entry.file == "unknown" {
+				tmp = hex.EncodeToString(c.SerialNumber.Bytes())
+				if entry.sn == tmp {
+					entry.file = filepath.Join(
+						"certs",
+						entry.cn+".cert.pem",
+					)
+				}
 			}
 
 			db.entries = append(db.entries, entry)
@@ -317,16 +367,40 @@ func (db *database) nextSerialNumber() (*big.Int, error) {
 	return sn, nil
 }
 
-// revoke will update the PKI db to reflect that the cert with the
-// specified serial number is revoked.
-func (db *database) revoke(sn *big.Int) error {
-	return db.commit(
+// revokeCN will update the PKI db to reflect that the oldest cert
+// with the specified CN is revoked.
+func (db *database) revokeCN(cn string) (*x509.Certificate, error) {
+	var c *x509.Certificate
+	var e error = db.commit(
+		true,
+		func() error {
+			for _, entry := range db.entries {
+				if (entry.cn == cn) && !entry.revoked {
+					c, _ = db.getCertFor(cn, false)
+					return entry.revoke()
+				}
+			}
+
+			return errors.Newf("cert for CommonName %s not found", cn)
+		},
+	)
+
+	return c, e
+}
+
+// revokeSN will update the PKI db to reflect that the cert with the
+// specified serial number is revoked. It will return the
+// corresponding CN.
+func (db *database) revokeSN(sn *big.Int) (string, error) {
+	var cn string
+	var e error = db.commit(
 		true,
 		func() error {
 			var tmp string = hex.EncodeToString(sn.Bytes())
 
 			for _, entry := range db.entries {
 				if entry.sn == tmp {
+					cn = entry.cn
 					return entry.revoke()
 				}
 			}
@@ -337,6 +411,8 @@ func (db *database) revoke(sn *big.Int) error {
 			)
 		},
 	)
+
+	return cn, e
 }
 
 // undo will delete the previous entry in the PKI db.

@@ -7,6 +7,7 @@ import (
 )
 
 // Errors
+var errNoCert error = errors.New("no Certificate provided")
 var errNoCN error = errors.New("no CommonName provided")
 
 // Permissions for directories and files
@@ -15,4 +16,4 @@ var roFilePerms os.FileMode = os.ModePerm & 0o400
 var rwFilePerms os.FileMode = os.ModePerm & 0o600
 
 // Version is the package version.
-const Version = "1.2.1"
+const Version = "1.3.0"
