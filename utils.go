@@ -186,22 +186,12 @@ func readCert(fn string) (*x509.Certificate, error) {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
 
-	if strings.HasSuffix(fn, ".der") {
-		if cert, e = x509.ParseCertificate(b); e != nil {
-			e = errors.Newf("failed to parse cert %s: %w", fn, e)
-			return nil, e
-		}
-	} else if strings.HasSuffix(fn, ".pem") {
-		if block, _ = pem.Decode(b); block == nil {
-			return nil, errors.Newf("no cert found in %s", fn)
-		}
+	if block, _ = pem.Decode(b); block != nil {
+		b = block.Bytes
+	}
 
-		if cert, e = x509.ParseCertificate(block.Bytes); e != nil {
-			e = errors.Newf("failed to parse cert %s: %w", fn, e)
-			return nil, e
-		}
-	} else {
-		return nil, errors.Newf("expected .pem or .der: %s", fn)
+	if cert, e = x509.ParseCertificate(b); e != nil {
+		return nil, errors.Newf("failed to parse cert %s: %w", fn, e)
 	}
 
 	return cert, nil
@@ -217,23 +207,12 @@ func readCSR(fn string) (*x509.CertificateRequest, error) {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
 
-	if strings.HasSuffix(fn, ".der") {
-		if csr, e = x509.ParseCertificateRequest(b); e != nil {
-			e = errors.Newf("failed to parse request %s: %w", fn, e)
-			return nil, e
-		}
-	} else if strings.HasSuffix(fn, ".pem") {
-		if block, _ = pem.Decode(b); block == nil {
-			return nil, errors.Newf("no request found in %s", fn)
-		}
+	if block, _ = pem.Decode(b); block != nil {
+		b = block.Bytes
+	}
 
-		csr, e = x509.ParseCertificateRequest(block.Bytes)
-		if e != nil {
-			e = errors.Newf("failed to parse request %s: %w", fn, e)
-			return nil, e
-		}
-	} else {
-		return nil, errors.Newf("expected .pem or .der: %s", fn)
+	if csr, e = x509.ParseCertificateRequest(b); e != nil {
+		return nil, errors.Newf("failed to parse csr %s: %w", fn, e)
 	}
 
 	return csr, nil
@@ -249,22 +228,12 @@ func readKey(fn string) (*rsa.PrivateKey, error) {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
 
-	if strings.HasSuffix(fn, ".der") {
-		if key, e = x509.ParsePKCS1PrivateKey(b); e != nil {
-			e = errors.Newf("failed to parse privkey %s: %w", fn, e)
-			return nil, e
-		}
-	} else if strings.HasSuffix(fn, ".pem") {
-		if block, _ = pem.Decode(b); block == nil {
-			return nil, errors.Newf("no privkey found in %s", fn)
-		}
+	if block, _ = pem.Decode(b); block != nil {
+		b = block.Bytes
+	}
 
-		if key, e = x509.ParsePKCS1PrivateKey(block.Bytes); e != nil {
-			e = errors.Newf("failed to parse privkey %s: %w", fn, e)
-			return nil, e
-		}
-	} else {
-		return nil, errors.Newf("expected .pem or .der: %s", fn)
+	if key, e = x509.ParsePKCS1PrivateKey(b); e != nil {
+		return nil, errors.Newf("failed to parse key %s: %w", fn, e)
 	}
 
 	return key, nil
