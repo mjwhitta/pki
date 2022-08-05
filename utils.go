@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -182,7 +181,7 @@ func readCert(fn string) (*x509.Certificate, error) {
 	var cert *x509.Certificate
 	var e error
 
-	if b, e = ioutil.ReadFile(fn); e != nil {
+	if b, e = os.ReadFile(fn); e != nil {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
 
@@ -203,7 +202,7 @@ func readCSR(fn string) (*x509.CertificateRequest, error) {
 	var csr *x509.CertificateRequest
 	var e error
 
-	if b, e = ioutil.ReadFile(fn); e != nil {
+	if b, e = os.ReadFile(fn); e != nil {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
 
@@ -224,7 +223,7 @@ func readKey(fn string) (*rsa.PrivateKey, error) {
 	var e error
 	var key *rsa.PrivateKey
 
-	if b, e = ioutil.ReadFile(fn); e != nil {
+	if b, e = os.ReadFile(fn); e != nil {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
 

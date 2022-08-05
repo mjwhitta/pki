@@ -4,12 +4,12 @@
 // X509 Certificates. Below is some sample code to create a default
 // self-signed PKI:
 //
-//     var e error
-//     var p *pki.PKI
+//	var e error
+//	var p *pki.PKI
 //
-//     if p, e = pki.New("/pki/root/dir", pki.NewCfg()); e != nil {
-//         panic(e)
-//     }
+//	if p, e = pki.New("/pki/root/dir", pki.NewCfg()); e != nil {
+//	    panic(e)
+//	}
 //
 // From there, client and server Certificates can be created or
 // Certificate Signing Requests (CSRs) can be imported and used to

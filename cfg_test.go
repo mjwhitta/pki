@@ -2,7 +2,6 @@ package pki_test
 
 import (
 	"crypto/x509/pkix"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -115,7 +114,7 @@ func TestString(t *testing.T) {
 	var tmp string = filepath.Join("testdata", "cfg")
 
 	// Get expected from file
-	b, e = ioutil.ReadFile(tmp)
+	b, e = os.ReadFile(tmp)
 	assert.Nil(t, e)
 	assert.NotNil(t, b)
 

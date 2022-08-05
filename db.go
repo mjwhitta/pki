@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/hex"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -242,7 +241,7 @@ func (db *database) initializeDB() error {
 		f.Chmod(rwFilePerms)
 		f.Close()
 	} else {
-		if b, e = ioutil.ReadFile(tmp); e != nil {
+		if b, e = os.ReadFile(tmp); e != nil {
 			return errors.Newf("failed to read %s: %w", tmp, e)
 		}
 
@@ -310,7 +309,7 @@ func (db *database) initializeSerial() error {
 		f.WriteString("\n")
 	} else {
 		// Read index.db.serial
-		if b, e = ioutil.ReadFile(tmp); e != nil {
+		if b, e = os.ReadFile(tmp); e != nil {
 			return errors.Newf("failed to read %s: %w", tmp, e)
 		}
 
