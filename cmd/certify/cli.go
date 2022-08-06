@@ -62,7 +62,9 @@ func init() {
 	cli.Info = strings.Join(
 		[]string{
 			"Easily generate a self-signed CA and issue",
-			"client/server certificates.",
+			"client/server certificates. To add Subject Alternative",
+			"Names (SANs), you can append \":alt\" as many times as",
+			"needed, for example: hostN:alt1...:altN.",
 		},
 		" ",
 	)

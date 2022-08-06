@@ -124,6 +124,7 @@ func TestCreateCA(t *testing.T) {
 
 func TestCreateCertFor(t *testing.T) {
 	type testData struct {
+		alts     []string
 		certType pki.CertType
 		cn       string
 	}
@@ -131,14 +132,17 @@ func TestCreateCertFor(t *testing.T) {
 	var p *pki.PKI = setup(t)
 	var tests = map[string]testData{
 		"CreateClientCert": {
+			alts:     []string{},
 			certType: pki.ClientCert,
 			cn:       "user",
 		},
 		"GetClientCert": {
+			alts:     []string{},
 			certType: pki.ClientCert,
 			cn:       "user",
 		},
 		"CreateServerCert": {
+			alts:     []string{"localhost", "127.0.0.1"},
 			certType: pki.ServerCert,
 			cn:       "example.com",
 		},

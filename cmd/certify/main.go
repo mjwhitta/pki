@@ -13,6 +13,7 @@ import (
 )
 
 func generateCerts(p *pki.PKI) error {
+	var alts []string
 	var e error
 
 	if !p.HasCA() {
@@ -34,9 +35,16 @@ func generateCerts(p *pki.PKI) error {
 
 	// Create client certs
 	for _, client := range flags.clients {
+		alts = strings.Split(client, ":")
+		client = alts[0]
+
 		if !p.HasCertFor(client) {
 			log.Infof("Creating client cert for %s", client)
-			_, _, e = p.CreateCertFor(client, pki.ClientCert)
+			_, _, e = p.CreateCertFor(
+				client,
+				pki.ClientCert,
+				alts[1:]...,
+			)
 			if e != nil {
 				return e
 			}
@@ -47,9 +55,16 @@ func generateCerts(p *pki.PKI) error {
 
 	// Create server certs
 	for _, server := range cli.Args() {
+		alts = strings.Split(server, ":")
+		server = alts[0]
+
 		if !p.HasCertFor(server) {
 			log.Infof("Creating server cert for %s", server)
-			_, _, e = p.CreateCertFor(server, pki.ServerCert)
+			_, _, e = p.CreateCertFor(
+				server,
+				pki.ServerCert,
+				alts[1:]...,
+			)
 			if e != nil {
 				return e
 			}

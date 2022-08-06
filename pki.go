@@ -26,6 +26,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -115,7 +116,7 @@ func (p *PKI) CreateCA() (*x509.Certificate, *rsa.PrivateKey, error) {
 // alredy exist on disk, they will be parsed and returned instead. See
 // CertType for supported Certificate types.
 func (p *PKI) CreateCertFor(
-	cn string, certType CertType,
+	cn string, certType CertType, alts ...string,
 ) (*x509.Certificate, *rsa.PrivateKey, error) {
 	var cert *x509.Certificate
 	var csr *x509.CertificateRequest
@@ -140,7 +141,7 @@ func (p *PKI) CreateCertFor(
 	}
 
 	// Use existing cert request, if found, otherwise create
-	if csr, e = p.createOrGetCSR(cn, key); e != nil {
+	if csr, e = p.createOrGetCSR(cn, key, alts...); e != nil {
 		return nil, nil, e
 	}
 
@@ -256,6 +257,7 @@ func (p *PKI) createCert(
 			BasicConstraintsValid: true,
 			DNSNames:              csr.DNSNames,
 			ExtKeyUsage:           extUsage,
+			IPAddresses:           csr.IPAddresses,
 			KeyUsage:              usage,
 			NotAfter:              after,
 			NotBefore:             before,
@@ -293,11 +295,14 @@ func (p *PKI) createCert(
 // CreateCSRFor will create a Certificate request for the specified
 // CommonName, signed by the provided private key.
 func (p *PKI) CreateCSRFor(
-	cn string, key *rsa.PrivateKey,
+	cn string, key *rsa.PrivateKey, alts ...string,
 ) (*x509.CertificateRequest, error) {
 	var b []byte
 	var csr *x509.CertificateRequest
+	var dns = []string{cn}
 	var e error
+	var ips []net.IP
+	var tmp net.IP
 
 	if cn == "" {
 		return nil, errNoCN
@@ -307,9 +312,19 @@ func (p *PKI) CreateCSRFor(
 		return nil, errors.New("no private key provided")
 	}
 
+	// Parse alts
+	for _, alt := range alts {
+		if tmp = net.ParseIP(alt); tmp != nil {
+			ips = append(ips, tmp)
+		} else {
+			dns = append(dns, alt)
+		}
+	}
+
 	// Create cert request template
 	csr = &x509.CertificateRequest{
-		DNSNames:           []string{cn},
+		DNSNames:           dns,
+		IPAddresses:        ips,
 		SignatureAlgorithm: sigAlgForKey(key),
 		Subject:            p.Cfg.Subject(cn),
 	}
@@ -369,7 +384,7 @@ func (p *PKI) createOrGetCert(
 }
 
 func (p *PKI) createOrGetCSR(
-	cn string, key *rsa.PrivateKey,
+	cn string, key *rsa.PrivateKey, alts ...string,
 ) (*x509.CertificateRequest, error) {
 	var csr *x509.CertificateRequest
 	var e error
@@ -383,7 +398,7 @@ func (p *PKI) createOrGetCSR(
 
 	if csr == nil {
 		// Create cert request
-		if csr, e = p.CreateCSRFor(cn, key); e != nil {
+		if csr, e = p.CreateCSRFor(cn, key, alts...); e != nil {
 			return nil, e
 		}
 	}
