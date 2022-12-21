@@ -55,6 +55,13 @@ Root CA), now is the time to overwrite `ca/ca.cert.pem` and
 `private/ca.key.pem` in the PKI directory. You can delete or overwrite
 the DER files as well. See `certify --help` for what to do next.
 
+```
+$ # Create server certificate
+$ certify --pki .../path/to/pki test.example.com
+$ # Create wildcard certificate
+$ certify --pki .../path/to/pki "example.com:*.example.com"
+```
+
 ### Library
 
 ```
@@ -84,19 +91,21 @@ func main() {
         panic(e)
     }
 
-    // Do stuff with your CA
-    println(ca.Subject.CommonName)
-    println(k.PublicKey.Size())
-
     // Create server Certificate
-    c, k, e = p.CreateCertFor("example.com", pki.ServerCert)
+    c, k, e = p.CreateCertFor("test.example.com", pki.ServerCert)
     if e != nil {
         panic(e)
     }
 
-    // Do stuff with your new Certificate
-    println(c.Subject.CommonName)
-    println(k.PublicKey.Size())
+    // Create wildcard Certificate
+    c, k, e = p.CreateCertFor(
+        "example.com",
+        pki.ServerCert,
+        []string{"*.example.com"},
+    )
+    if e != nil {
+        panic(e)
+    }
 
     // Sync the ders and pems directories for convenience
     if e = p.Sync(); e != nil {
