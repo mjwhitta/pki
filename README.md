@@ -2,9 +2,9 @@
 
 <a href="https://www.buymeacoffee.com/mjwhitta">🍪 Buy me a cookie</a>
 
-[![Go Report Card](https://goreportcard.com/badge/gitlab.com/mjwhitta/pki)](https://goreportcard.com/report/gitlab.com/mjwhitta/pki)
-[![Pipeline](https://gitlab.com/mjwhitta/pki/badges/master/pipeline.svg)](https://gitlab.com/mjwhitta/pki/-/pipelines/latest)
-[![Coverage](https://gitlab.com/mjwhitta/pki/badges/master/coverage.svg)](https://gitlab.com/mjwhitta/pki)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mjwhitta/pki)](https://goreportcard.com/report/github.com/mjwhitta/pki)
+[![Pipeline](https://github.com/mjwhitta/pki/badges/master/pipeline.svg)](https://github.com/mjwhitta/pki/-/pipelines/latest)
+[![Coverage](https://github.com/mjwhitta/pki/badges/master/coverage.svg)](https://github.com/mjwhitta/pki)
 
 ## What is this?
 
@@ -16,16 +16,16 @@ Open a terminal and run the following:
 
 ```
 $ # For library usage
-$ go get --ldflags "-s -w" --trimpath -u gitlab.com/mjwhitta/pki
+$ go get --ldflags "-s -w" --trimpath -u github.com/mjwhitta/pki
 $ # For cli usage
 $ go install --ldflags "-s -w" --trimpath \
-    gitlab.com/mjwhitta/pki/cmd/certify@latest
+    github.com/mjwhitta/pki/cmd/certify@latest
 ```
 
 Or compile from source:
 
 ```
-$ git clone https://gitlab.com/mjwhitta/pki.git
+$ git clone https://github.com/mjwhitta/pki.git
 $ cd pki
 $ git submodule update --init
 $ make
@@ -71,7 +71,7 @@ import (
     "crypto/rsa"
     "crypto/x509"
 
-    "gitlab.com/mjwhitta/pki"
+    "github.com/mjwhitta/pki"
 )
 
 func main() {
@@ -116,7 +116,7 @@ func main() {
 
 ## Links
 
-- [Source](https://gitlab.com/mjwhitta/pki)
+- [Source](https://github.com/mjwhitta/pki)
 
 ## TODO
 

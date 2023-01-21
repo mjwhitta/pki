@@ -31,7 +31,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"gitlab.com/mjwhitta/errors"
+	"github.com/mjwhitta/errors"
 )
 
 // PKI is a structure that contains the PKI config, key size for

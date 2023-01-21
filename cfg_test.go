@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mjwhitta/pki"
 	assert "github.com/stretchr/testify/require"
-	"gitlab.com/mjwhitta/pki"
 )
 
 func TestCfgFromFile(t *testing.T) {

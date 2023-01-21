@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"gitlab.com/mjwhitta/errors"
-	"gitlab.com/mjwhitta/pathname"
+	"github.com/mjwhitta/errors"
+	"github.com/mjwhitta/pathname"
 )
 
 // database contains all relevant PKI metadata similar to OpenSSL's

@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/mjwhitta/errors"
-	"gitlab.com/mjwhitta/pathname"
+	"github.com/mjwhitta/errors"
+	"github.com/mjwhitta/pathname"
 )
 
 func copyTo(root string, dir string, fn string) error {

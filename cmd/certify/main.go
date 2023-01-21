@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"gitlab.com/mjwhitta/cli"
-	"gitlab.com/mjwhitta/errors"
-	hl "gitlab.com/mjwhitta/hilighter"
-	"gitlab.com/mjwhitta/log"
-	"gitlab.com/mjwhitta/pki"
+	"github.com/mjwhitta/cli"
+	"github.com/mjwhitta/errors"
+	hl "github.com/mjwhitta/hilighter"
+	"github.com/mjwhitta/log"
+	"github.com/mjwhitta/pki"
 )
 
 func generateCerts(p *pki.PKI) error {

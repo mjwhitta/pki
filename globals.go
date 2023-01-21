@@ -3,7 +3,7 @@ package pki
 import (
 	"os"
 
-	"gitlab.com/mjwhitta/errors"
+	"github.com/mjwhitta/errors"
 )
 
 // Errors
@@ -16,4 +16,4 @@ var roFilePerms os.FileMode = os.ModePerm & 0o400
 var rwFilePerms os.FileMode = os.ModePerm & 0o600
 
 // Version is the package version.
-const Version = "1.4.0"
+const Version = "1.4.1"

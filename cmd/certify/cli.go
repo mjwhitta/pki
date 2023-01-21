@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/mjwhitta/cli"
-	hl "gitlab.com/mjwhitta/hilighter"
-	"gitlab.com/mjwhitta/pathname"
-	"gitlab.com/mjwhitta/pki"
+	"github.com/mjwhitta/cli"
+	hl "github.com/mjwhitta/hilighter"
+	"github.com/mjwhitta/pathname"
+	"github.com/mjwhitta/pki"
 )
 
 // Exit status

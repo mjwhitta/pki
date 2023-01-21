@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/mjwhitta/pki"
 	assert "github.com/stretchr/testify/require"
-	"gitlab.com/mjwhitta/pki"
 )
 
 func setup(t *testing.T, dirs ...string) *pki.PKI {
