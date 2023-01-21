@@ -3,8 +3,7 @@
 <a href="https://www.buymeacoffee.com/mjwhitta">🍪 Buy me a cookie</a>
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/mjwhitta/pki)](https://goreportcard.com/report/github.com/mjwhitta/pki)
-[![Pipeline](https://github.com/mjwhitta/pki/badges/master/pipeline.svg)](https://github.com/mjwhitta/pki/-/pipelines/latest)
-[![Coverage](https://github.com/mjwhitta/pki/badges/master/coverage.svg)](https://github.com/mjwhitta/pki)
+![Workflow](https://github.com/mjwhitta/pki/actions/workflows/ci.yaml/badge.svg?event=push)
 
 ## What is this?
 
