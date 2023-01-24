@@ -86,7 +86,7 @@ func main() {
 		}
 	}()
 
-	var ans string
+	var answer string
 	var c *pki.Cfg
 	var e error
 	var p *pki.PKI
@@ -115,9 +115,9 @@ func main() {
 
 	if flags.erase {
 		hl.PrintYellow("Erase PKI (y/N)? ")
-		fmt.Scanln(&ans)
+		fmt.Scanln(&answer)
 
-		switch strings.TrimSpace(strings.ToLower(ans)) {
+		switch strings.TrimSpace(strings.ToLower(answer)) {
 		case "y", "yes":
 			log.Warn("Erasing PKI")
 			if e = p.Erase(); e != nil {

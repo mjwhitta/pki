@@ -10,7 +10,7 @@ import (
 	"github.com/mjwhitta/errors"
 )
 
-// certEntry is a struct containing relavant data for an entry in the
+// certEntry is a struct containing relevant data for an entry in the
 // PKI's db.
 type certEntry struct {
 	cn      string

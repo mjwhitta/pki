@@ -113,8 +113,8 @@ func (p *PKI) CreateCA() (*x509.Certificate, *rsa.PrivateKey, error) {
 // CreateCertFor will create a Certificate for the specified
 // CommonName, signed by the PKI's CA. The new Certificate and its
 // associated private key will be returned. If a Certificate and key
-// alredy exist on disk, they will be parsed and returned instead. See
-// CertType for supported Certificate types.
+// already exist on disk, they will be parsed and returned instead.
+// See CertType for supported Certificate types.
 func (p *PKI) CreateCertFor(
 	cn string, certType CertType, alts ...string,
 ) (*x509.Certificate, *rsa.PrivateKey, error) {
