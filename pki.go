@@ -713,7 +713,7 @@ func (p *PKI) RevokeCertFor(cn string) (*x509.Certificate, error) {
 }
 
 // Sync will make sure that all ders/pems are mirrored in the
-// associated directories for convienent access.
+// associated directories for convenient access.
 func (p *PKI) Sync() error {
 	var cert *x509.Certificate
 	var e error
