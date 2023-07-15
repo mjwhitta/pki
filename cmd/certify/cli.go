@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/mjwhitta/cli"
 	hl "github.com/mjwhitta/hilighter"
@@ -46,27 +45,21 @@ func init() {
 		os.Args[0],
 	)
 	cli.BugEmail = "pki.bugs@whitta.dev"
-	cli.ExitStatus = strings.Join(
-		[]string{
-			"Normally the exit status is 0. In the event of an error",
-			"the exit status will be one of the below:\n\n",
-			hl.Sprintf("%d: Invalid option\n", InvalidOption),
-			hl.Sprintf("%d: Missing option\n", MissingOption),
-			hl.Sprintf("%d: Invalid argument\n", InvalidArgument),
-			hl.Sprintf("%d: Missing argument\n", MissingArgument),
-			hl.Sprintf("%d: Extra argument\n", ExtraArgument),
-			hl.Sprintf("%d: Exception", Exception),
-		},
-		" ",
+	cli.ExitStatus(
+		"Normally the exit status is 0. In the event of an error the",
+		"exit status will be one of the below:\n\n",
+		hl.Sprintf("%d: Invalid option\n", InvalidOption),
+		hl.Sprintf("%d: Missing option\n", MissingOption),
+		hl.Sprintf("%d: Invalid argument\n", InvalidArgument),
+		hl.Sprintf("%d: Missing argument\n", MissingArgument),
+		hl.Sprintf("%d: Extra argument\n", ExtraArgument),
+		hl.Sprintf("%d: Exception", Exception),
 	)
-	cli.Info = strings.Join(
-		[]string{
-			"Easily generate a self-signed CA and issue",
-			"client/server certificates. To add Subject Alternative",
-			"Names (SANs), you can append \":alt\" as many times as",
-			"needed, for example: hostN:alt1...:altN.",
-		},
-		" ",
+	cli.Info(
+		"Easily generate a self-signed CA and issue client/server",
+		"certificates. To add Subject Alternative Names (SANs), you",
+		"can append \":alt\" as many times as needed, for example:",
+		"hostN:alt1...:altN.",
 	)
 	cli.SeeAlso = []string{"openssl"}
 

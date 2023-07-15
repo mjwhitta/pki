@@ -84,7 +84,7 @@ func New(root string, cfg *Cfg) (*PKI, error) {
 // already exist on disk, they will be parsed and returned instead.
 func (p *PKI) CreateCA() (*x509.Certificate, *rsa.PrivateKey, error) {
 	var e error
-	var pubkey interface{} // *rsa.PublicKey
+	var pubkey any // *rsa.PublicKey
 
 	// Use existing key, if found, otherwise create
 	if p.key, e = p.createOrGetKey("ca"); e != nil {
@@ -158,7 +158,7 @@ func (p *PKI) createCert(
 	ca *x509.Certificate,
 	cn string,
 	csr *x509.CertificateRequest,
-	pubkey interface{}, // *rsa.PublicKey
+	pubkey any, // *rsa.PublicKey
 	certType CertType,
 ) (*x509.Certificate, error) {
 	var after time.Time
@@ -354,7 +354,7 @@ func (p *PKI) CreateCSRFor(
 func (p *PKI) createOrGetCert(
 	cn string,
 	csr *x509.CertificateRequest,
-	pubkey interface{}, // *rsa.PublicKey
+	pubkey any, // *rsa.PublicKey
 	certType CertType,
 ) (*x509.Certificate, error) {
 	var cert *x509.Certificate
