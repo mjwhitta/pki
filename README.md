@@ -67,41 +67,33 @@ $ certify --pki .../path/to/pki "example.com:*.example.com"
 ```
 package main
 
-import (
-    "crypto/rsa"
-    "crypto/x509"
-
-    "github.com/mjwhitta/pki"
-)
+import "github.com/mjwhitta/pki"
 
 func main() {
-    var c *x509.Certificate
-    var ca *x509.Certificate
     var e error
-    var k *rsa.PrivateKey
     var p *pki.PKI
 
     // Create PKI structure
-    if p, e = pki.New("/pki/root/dir", pki.NewCfg()); e != nil {
+    if p, e = pki.New(".../path/to/pki", pki.NewCfg()); e != nil {
         panic(e)
     }
 
     // Create CA
-    if ca, k, e = p.CreateCA(); e != nil {
+    if _, _, e = p.CreateCA(); e != nil {
         panic(e)
     }
 
     // Create server Certificate
-    c, k, e = p.CreateCertFor("test.example.com", pki.ServerCert)
+    _, _, e = p.CreateCertFor("test.example.com", pki.ServerCert)
     if e != nil {
         panic(e)
     }
 
     // Create wildcard Certificate
-    c, k, e = p.CreateCertFor(
+    _, _, e = p.CreateCertFor(
         "example.com",
         pki.ServerCert,
-        []string{"*.example.com"},
+        "*.example.com",
     )
     if e != nil {
         panic(e)
