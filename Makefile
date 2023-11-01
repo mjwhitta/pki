@@ -3,5 +3,5 @@
 
 ifneq ($(unameS),Windows)
 spellcheck:
-	@codespell -f -L keypair -S ".git,*.pem"
+	@codespell -f -L hilighter,keypair -S ".git,*.pem"
 endif

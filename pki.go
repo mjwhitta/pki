@@ -610,7 +610,7 @@ func (p *PKI) ImportCSR(fn string) error {
 		return e
 	}
 
-	// Validate the cert equest has a CN
+	// Validate the cert request has a CN
 	if cn = csr.Subject.CommonName; cn == "" {
 		return errors.Newf("cert request %s has no CommonName", fn)
 	}
