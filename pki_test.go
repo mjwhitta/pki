@@ -14,6 +14,8 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
+type cnFunc func(cn string) string
+
 func setup(t *testing.T, dirs ...string) *pki.PKI {
 	var dir string = t.TempDir()
 	var e error
@@ -130,7 +132,7 @@ func TestCreateCertFor(t *testing.T) {
 	}
 
 	var p *pki.PKI = setup(t)
-	var tests = map[string]testData{
+	var tests map[string]testData = map[string]testData{
 		"CreateClientCert": {
 			alts:     []string{},
 			certType: pki.ClientCert,
@@ -517,7 +519,7 @@ func TestFingerprintFor(t *testing.T) {
 
 func TestGetFiles(t *testing.T) {
 	var p *pki.PKI = setup(t)
-	var tests = map[string]func(cn string) string{
+	var tests map[string]cnFunc = map[string]cnFunc{
 		"CertNoCN": p.GetCertFileFor,
 		"CSRNoCN":  p.GetCSRFileFor,
 		"KeyNoCN":  p.GetKeyFileFor,
@@ -534,7 +536,7 @@ func TestGetFiles(t *testing.T) {
 		)
 	}
 
-	tests = map[string]func(cn string) string{
+	tests = map[string]cnFunc{
 		"SuccessCert": p.GetCertFileFor,
 		"SuccessCSR":  p.GetCSRFileFor,
 		"SuccessKey":  p.GetKeyFileFor,
@@ -767,7 +769,7 @@ func TestIsExpired(t *testing.T) {
 		expected bool
 	}
 
-	var tests = map[string]testData{
+	var tests map[string]testData = map[string]testData{
 		"Expired":    {-1, true},
 		"NotExpired": {1, false},
 	}
@@ -842,7 +844,7 @@ func TestIsRevoked(t *testing.T) {
 }
 
 func TestKeySize(t *testing.T) {
-	var tests = map[string]int{
+	var tests map[string]int = map[string]int{
 		"2048": 2048,
 		"3072": 3072,
 		"4096": 4096,

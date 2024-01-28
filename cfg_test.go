@@ -13,7 +13,7 @@ import (
 )
 
 func TestCfgFromFile(t *testing.T) {
-	var tests = map[string]string{
+	var tests map[string]string = map[string]string{
 		"ErrorConfigNotFound": "noexist",
 		"ErrorInvalidSyntax":  "invalid",
 		"ErrorInvalidValue":   "invalidint",
@@ -87,7 +87,7 @@ func TestCommonName(t *testing.T) {
 }
 
 func TestSetOption(t *testing.T) {
-	var tests = map[string][]string{
+	var tests map[string][]string = map[string][]string{
 		"ErrorInvalidCADays":   {"cadays", "test"},
 		"ErrorInvalidCertDays": {"certdays", "test"},
 		"ErrorInvalidOption":   {"test", "true"},
@@ -153,7 +153,9 @@ func TestSubject(t *testing.T) {
 		"DefaultSubject",
 		func(t *testing.T) {
 			var c *pki.Cfg = pki.NewCfg()
-			var expected = pkix.Name{CommonName: "Self-signed CA"}
+			var expected pkix.Name = pkix.Name{
+				CommonName: "Self-signed CA",
+			}
 
 			assert.Equal(t, expected, c.Subject())
 		},
@@ -163,7 +165,7 @@ func TestSubject(t *testing.T) {
 		"ConfiguredSubject",
 		func(t *testing.T) {
 			var c *pki.Cfg = pki.NewCfg()
-			var expected = pkix.Name{
+			var expected pkix.Name = pkix.Name{
 				CommonName:         "CN",
 				Country:            []string{"C"},
 				Locality:           []string{"L"},
@@ -187,7 +189,7 @@ func TestSubject(t *testing.T) {
 		"OverrideCNInSubject",
 		func(t *testing.T) {
 			var c *pki.Cfg = pki.NewCfg()
-			var expected = pkix.Name{CommonName: "CN"}
+			var expected pkix.Name = pkix.Name{CommonName: "CN"}
 
 			assert.Equal(t, expected, c.Subject("CN"))
 		},

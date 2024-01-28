@@ -299,7 +299,7 @@ func (p *PKI) CreateCSRFor(
 ) (*x509.CertificateRequest, error) {
 	var b []byte
 	var csr *x509.CertificateRequest
-	var dns = []string{cn}
+	var dns []string = []string{cn}
 	var e error
 	var ips []net.IP
 	var tmp net.IP
@@ -454,7 +454,7 @@ func (p *PKI) CreateRSAKeyFor(cn string) (*rsa.PrivateKey, error) {
 // This is non-reversable.
 func (p *PKI) Erase() error {
 	var e error
-	var dirs = []string{
+	var dirs []string = []string{
 		"ca",
 		"certs",
 		"csr",
@@ -632,7 +632,7 @@ func (p *PKI) ImportCSR(fn string) error {
 // initialize will create all PKI related directories.
 func (p *PKI) initialize() error {
 	var e error
-	var dirs = []string{
+	var dirs []string = []string{
 		"ca",
 		"certs",
 		"csr",
@@ -869,7 +869,7 @@ func (p *PKI) Undo() error {
 
 func (p *PKI) unsync() error {
 	var e error
-	var dirs = []string{
+	var dirs []string = []string{
 		"ders",
 		"pems",
 	}

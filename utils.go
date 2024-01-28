@@ -72,7 +72,7 @@ func createRWDir(dir string) error {
 
 func deleteCert(root string, cn string) error {
 	var e error
-	var files = []string{
+	var files []string = []string{
 		filepath.Join(root, "certs", cn+".cert.der"),
 		filepath.Join(root, "certs", cn+".cert.pem"),
 	}
@@ -94,7 +94,7 @@ func deleteCert(root string, cn string) error {
 
 func deleteCSR(root string, cn string) error {
 	var e error
-	var files = []string{
+	var files []string = []string{
 		filepath.Join(root, "csr", cn+".csr.der"),
 		filepath.Join(root, "csr", cn+".csr.pem"),
 	}
@@ -119,7 +119,7 @@ func deleteCSR(root string, cn string) error {
 
 func deleteKey(root string, cn string) error {
 	var e error
-	var files = []string{
+	var files []string = []string{
 		filepath.Join(root, "private", cn+".key.der"),
 		filepath.Join(root, "private", cn+".key.pem"),
 	}
@@ -296,7 +296,7 @@ func writeCert(root string, cn string, cert *x509.Certificate) error {
 func writeChain(root, cn string, certs ...*x509.Certificate) error {
 	var e error
 	var f *os.File
-	var files = []string{
+	var files []string = []string{
 		filepath.Join(root, "ders", cn+".chain.der"),
 		filepath.Join(root, "pems", cn+".chain.pem"),
 	}
@@ -342,7 +342,7 @@ func writeChain(root, cn string, certs ...*x509.Certificate) error {
 func writeCSR(root, cn string, csr *x509.CertificateRequest) error {
 	var e error
 	var f *os.File
-	var files = []string{
+	var files []string = []string{
 		filepath.Join(root, "csr", cn+".csr.der"),
 		filepath.Join(root, "csr", cn+".csr.pem"),
 	}
@@ -385,7 +385,7 @@ func writeCSR(root, cn string, csr *x509.CertificateRequest) error {
 func writeKey(root string, cn string, key *rsa.PrivateKey) error {
 	var e error
 	var f *os.File
-	var files = []string{
+	var files []string = []string{
 		filepath.Join(root, "private", cn+".key.der"),
 		filepath.Join(root, "private", cn+".key.pem"),
 	}
@@ -426,7 +426,7 @@ func writeKeyPair(
 ) error {
 	var e error
 	var f *os.File
-	var files = []string{
+	var files []string = []string{
 		filepath.Join(root, "ders", cn+".der"),
 		filepath.Join(root, "pems", cn+".pem"),
 	}

@@ -40,8 +40,8 @@ func newEntry(cert *x509.Certificate) *certEntry {
 	entry.file = filepath.Join("certs", cn+".cert.pem")
 
 	// Build distinguished name to match OpenSSL format
-	for i := 0; i < len(tmp)/2; i++ {
-		j := len(tmp) - i - 1
+	for i, j := 0, 0; i < len(tmp)/2; i++ {
+		j = len(tmp) - i - 1
 		tmp[i], tmp[j] = tmp[j], tmp[i]
 	}
 	entry.name = "/" + strings.Join(tmp, "/")
@@ -114,9 +114,9 @@ func (c *certEntry) revoke() error {
 	return nil
 }
 
-// String will return the string representation of a certEntry.
+// String will return a string representation of the certEntry.
 func (c *certEntry) String() string {
-	var out = []string{
+	var out []string = []string{
 		c.status,
 		c.expires,
 		c.revokes,

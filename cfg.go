@@ -169,9 +169,9 @@ func (cfg *Cfg) State(s string) {
 	cfg.Province(s)
 }
 
-// String will return the string representation of the Cfg instance.
+// String will return a string representation of the Cfg.
 func (cfg *Cfg) String() string {
-	var out = []string{
+	var out []string = []string{
 		"# Adjust and uncomment these values as needed",
 		"",
 		"cacn = " + cfg.subject["CN"],

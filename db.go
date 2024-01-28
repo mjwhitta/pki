@@ -106,7 +106,11 @@ func (db *database) commit(wLock bool, t transaction) error {
 
 // erase will erase all files related to the PKI db.
 func (db *database) erase() error {
-	var rms = []string{"index.db", "index.db.attr", "index.db.serial"}
+	var rms []string = []string{
+		"index.db",
+		"index.db.attr",
+		"index.db.serial",
+	}
 
 	for _, rm := range rms {
 		if e := os.RemoveAll(filepath.Join(db.root, rm)); e != nil {

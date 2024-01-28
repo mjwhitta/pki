@@ -136,7 +136,7 @@ func init() {
 
 // Process cli flags and ensure no issues
 func validate() {
-	var actions = []bool{
+	var actions []bool = []bool{
 		flags.erase,
 		flags.revoke,
 		flags.sample,
