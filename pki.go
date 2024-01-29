@@ -451,7 +451,7 @@ func (p *PKI) CreateRSAKeyFor(cn string) (*rsa.PrivateKey, error) {
 }
 
 // Erase will erase all PKI related files and directories. Be careful.
-// This is non-reversable.
+// This is non-reversible.
 func (p *PKI) Erase() error {
 	var e error
 	var dirs []string = []string{
