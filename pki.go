@@ -470,10 +470,9 @@ func (p *PKI) Erase() error {
 	}
 
 	p.ca = nil
-	p.db.erase()
 	p.key = nil
 
-	return nil
+	return p.db.erase()
 }
 
 // Fingerprint will return the sha1 hash of the provided Certificate.
@@ -680,9 +679,9 @@ func (p *PKI) RevokeCert(cert *x509.Certificate) error {
 
 	// Delete files, but don't throw error here b/c files may have
 	// been manually deleted.
-	deleteCert(p.Root, cn)
-	deleteCSR(p.Root, cn)
-	deleteKey(p.Root, cn)
+	_ = deleteCert(p.Root, cn)
+	_ = deleteCSR(p.Root, cn)
+	_ = deleteKey(p.Root, cn)
 
 	return nil
 }
@@ -705,9 +704,9 @@ func (p *PKI) RevokeCertFor(cn string) (*x509.Certificate, error) {
 
 	// Delete files, but don't throw error here b/c files may have
 	// been manually deleted.
-	deleteCert(p.Root, cn)
-	deleteCSR(p.Root, cn)
-	deleteKey(p.Root, cn)
+	_ = deleteCert(p.Root, cn)
+	_ = deleteCSR(p.Root, cn)
+	_ = deleteKey(p.Root, cn)
 
 	return cert, nil
 }
@@ -852,7 +851,7 @@ func (p *PKI) Undo() error {
 	}
 
 	// Delete files
-	deleteCert(p.Root, cn)
+	_ = deleteCert(p.Root, cn)
 	if p.HasCSRFor(cn) {
 		if e = deleteCSR(p.Root, cn); e != nil {
 			return e

@@ -62,7 +62,7 @@ func createRWDir(dir string) error {
 		return nil
 	}
 
-	if e = os.MkdirAll(dir, rwDirPerms); e != nil {
+	if e = os.MkdirAll(dir, 0o700); e != nil {
 		e = errors.Newf("failed to create %s directory: %w", dir, e)
 		return e
 	}
@@ -276,11 +276,14 @@ func writeCert(root string, cn string, cert *x509.Certificate) error {
 		}
 
 		// Write file
-		f.Chmod(rwFilePerms)
+		if e = f.Chmod(0o600); e != nil {
+			return errors.Newf("failed to modify permissions: %w", e)
+		}
+
 		if strings.HasSuffix(file, ".der") {
-			f.Write(cert.Raw)
+			_, _ = f.Write(cert.Raw)
 		} else if strings.HasSuffix(file, ".pem") {
-			pem.Encode(
+			_ = pem.Encode(
 				f,
 				&pem.Block{Bytes: cert.Raw, Type: "CERTIFICATE"},
 			)
@@ -321,11 +324,15 @@ func writeChain(root, cn string, certs ...*x509.Certificate) error {
 		// Write each cert in chain
 		for _, cert := range certs {
 			// Write file
-			f.Chmod(rwFilePerms)
+			if e = f.Chmod(0o600); e != nil {
+				e = errors.Newf("failed to modify permissions: %w", e)
+				return e
+			}
+
 			if strings.HasSuffix(file, ".der") {
-				f.Write(cert.Raw)
+				_, _ = f.Write(cert.Raw)
 			} else if strings.HasSuffix(file, ".pem") {
-				pem.Encode(
+				_ = pem.Encode(
 					f,
 					&pem.Block{Bytes: cert.Raw, Type: "CERTIFICATE"},
 				)
@@ -362,11 +369,14 @@ func writeCSR(root, cn string, csr *x509.CertificateRequest) error {
 		}
 
 		// Write file
-		f.Chmod(rwFilePerms)
+		if e = f.Chmod(0o600); e != nil {
+			return errors.Newf("failed to modify permissions: %w", e)
+		}
+
 		if strings.HasSuffix(file, ".der") {
-			f.Write(csr.Raw)
+			_, _ = f.Write(csr.Raw)
 		} else if strings.HasSuffix(file, ".pem") {
-			pem.Encode(
+			_ = pem.Encode(
 				f,
 				&pem.Block{
 					Bytes: csr.Raw,
@@ -401,11 +411,14 @@ func writeKey(root string, cn string, key *rsa.PrivateKey) error {
 		}
 
 		// Write file
-		f.Chmod(roFilePerms)
+		if e = f.Chmod(0o400); e != nil {
+			return errors.Newf("failed to modify permissions: %w", e)
+		}
+
 		if strings.HasSuffix(file, ".der") {
-			f.Write(x509.MarshalPKCS1PrivateKey(key))
+			_, _ = f.Write(x509.MarshalPKCS1PrivateKey(key))
 		} else if strings.HasSuffix(file, ".pem") {
-			pem.Encode(
+			_ = pem.Encode(
 				f,
 				&pem.Block{
 					Bytes: x509.MarshalPKCS1PrivateKey(key),
@@ -445,16 +458,19 @@ func writeKeyPair(
 		}
 
 		// Write file
-		f.Chmod(rwFilePerms)
+		if e = f.Chmod(0o600); e != nil {
+			return errors.Newf("failed to modify permissions: %w", e)
+		}
+
 		if strings.HasSuffix(file, ".der") {
-			f.Write(cert.Raw)
-			f.Write(x509.MarshalPKCS1PrivateKey(key))
+			_, _ = f.Write(cert.Raw)
+			_, _ = f.Write(x509.MarshalPKCS1PrivateKey(key))
 		} else if strings.HasSuffix(file, ".pem") {
-			pem.Encode(
+			_ = pem.Encode(
 				f,
 				&pem.Block{Bytes: cert.Raw, Type: "CERTIFICATE"},
 			)
-			pem.Encode(
+			_ = pem.Encode(
 				f,
 				&pem.Block{
 					Bytes: x509.MarshalPKCS1PrivateKey(key),

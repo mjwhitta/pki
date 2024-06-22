@@ -46,7 +46,9 @@ func TestCfgFromFile(t *testing.T) {
 			}
 
 			// Ensure perms get fixed b/c git
-			defer os.Chmod(tmp, 0o600)
+			defer func() {
+				_ = os.Chmod(tmp, 0o600)
+			}()
 
 			// Ensure not readable
 			e = os.Chmod(tmp, 0o200)

@@ -49,7 +49,9 @@ func TestCreateCA(t *testing.T) {
 			}
 
 			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "private"), 0o700)
+			defer func() {
+				_ = os.Chmod(filepath.Join(p.Root, "private"), 0o700)
+			}()
 			e = os.Chmod(filepath.Join(p.Root, "private"), 0o500)
 			assert.Nil(t, e)
 
@@ -73,7 +75,9 @@ func TestCreateCA(t *testing.T) {
 			}
 
 			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "ca"), 0o700)
+			defer func() {
+				_ = os.Chmod(filepath.Join(p.Root, "ca"), 0o700)
+			}()
 			e = os.Chmod(filepath.Join(p.Root, "ca"), 0o500)
 			assert.Nil(t, e)
 
@@ -320,7 +324,9 @@ func TestCreateCSRFor(t *testing.T) {
 			assert.NotNil(t, k)
 
 			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "csr"), 0o700)
+			defer func() {
+				_ = os.Chmod(filepath.Join(p.Root, "csr"), 0o700)
+			}()
 			e = os.Chmod(filepath.Join(p.Root, "csr"), 0o500)
 			assert.Nil(t, e)
 
@@ -362,7 +368,9 @@ func TestCreateRSAKeyFor(t *testing.T) {
 			}
 
 			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "private"), 0o700)
+			defer func() {
+				_ = os.Chmod(filepath.Join(p.Root, "private"), 0o700)
+			}()
 			e = os.Chmod(filepath.Join(p.Root, "private"), 0o500)
 			assert.Nil(t, e)
 
@@ -411,7 +419,9 @@ func TestErase(t *testing.T) {
 			}
 
 			// Ensure not writable
-			defer os.Chmod(p.Root, 0o700)
+			defer func() {
+				_ = os.Chmod(p.Root, 0o700)
+			}()
 			e = os.Chmod(p.Root, 0o500)
 			assert.Nil(t, e)
 
@@ -731,7 +741,9 @@ func TestImportCSR(t *testing.T) {
 			assert.NotNil(t, csr)
 
 			// Ensure not writable
-			defer os.Chmod(filepath.Join(p2.Root, "csr"), 0o700)
+			defer func() {
+				_ = os.Chmod(filepath.Join(p2.Root, "csr"), 0o700)
+			}()
 			e = os.Chmod(filepath.Join(p2.Root, "csr"), 0o500)
 			assert.Nil(t, e)
 
@@ -880,7 +892,9 @@ func TestNew(t *testing.T) {
 			var tmp string = filepath.Join(pkiDir, "nopki")
 
 			// Ensure not writable
-			defer os.Chmod(pkiDir, 0o700)
+			defer func() {
+				_ = os.Chmod(pkiDir, 0o700)
+			}()
 			e = os.Chmod(pkiDir, 0o500)
 			assert.Nil(t, e)
 
@@ -1074,7 +1088,9 @@ func TestSync(t *testing.T) {
 			}
 
 			// Ensure not writable
-			defer os.Chmod(p.Root, 0o700)
+			defer func() {
+				_ = os.Chmod(p.Root, 0o700)
+			}()
 			e = os.Chmod(p.Root, 0o500)
 			assert.Nil(t, e)
 
@@ -1198,7 +1214,9 @@ func TestUndo(t *testing.T) {
 			assert.NotNil(t, k)
 
 			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "index.db"), 0o600)
+			defer func() {
+				_ = os.Chmod(filepath.Join(p.Root, "index.db"), 0o600)
+			}()
 			e = os.Chmod(filepath.Join(p.Root, "index.db"), 0o400)
 			assert.Nil(t, e)
 
@@ -1236,7 +1254,9 @@ func TestUndo(t *testing.T) {
 			assert.NotNil(t, k)
 
 			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "csr"), 0o700)
+			defer func() {
+				_ = os.Chmod(filepath.Join(p.Root, "csr"), 0o700)
+			}()
 			e = os.Chmod(filepath.Join(p.Root, "csr"), 0o500)
 			assert.Nil(t, e)
 
@@ -1263,7 +1283,9 @@ func TestUndo(t *testing.T) {
 			assert.NotNil(t, k)
 
 			// Ensure not writable
-			defer os.Chmod(filepath.Join(p.Root, "private"), 0o700)
+			defer func() {
+				_ = os.Chmod(filepath.Join(p.Root, "private"), 0o700)
+			}()
 			e = os.Chmod(filepath.Join(p.Root, "private"), 0o500)
 			assert.Nil(t, e)
 

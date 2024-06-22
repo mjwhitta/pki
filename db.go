@@ -209,10 +209,12 @@ func (db *database) initializeAttr() error {
 		defer f.Close()
 
 		// Sane permissions
-		f.Chmod(rwFilePerms)
+		if e = f.Chmod(0o600); e != nil {
+			return errors.Newf("failed to modify permissions: %w", e)
+		}
 
 		// For now this is hard-coded
-		f.WriteString("unique_subject = no\n")
+		_, _ = f.WriteString("unique_subject = no\n")
 	}
 
 	return nil
@@ -242,7 +244,10 @@ func (db *database) initializeDB() error {
 		}
 
 		// Sane permissions
-		f.Chmod(rwFilePerms)
+		if e = f.Chmod(0o600); e != nil {
+			return errors.Newf("failed to modify permissions: %w", e)
+		}
+
 		f.Close()
 	} else {
 		if b, e = os.ReadFile(tmp); e != nil {
@@ -306,11 +311,15 @@ func (db *database) initializeSerial() error {
 		defer f.Close()
 
 		// Sane permissions
-		f.Chmod(rwFilePerms)
+		if e = f.Chmod(0o600); e != nil {
+			return errors.Newf("failed to modify permissions: %w", e)
+		}
 
 		// Write as hex
-		f.WriteString(hex.EncodeToString(db.serialNumber.Bytes()))
-		f.WriteString("\n")
+		_, _ = f.WriteString(
+			hex.EncodeToString(db.serialNumber.Bytes()),
+		)
+		_, _ = f.WriteString("\n")
 	} else {
 		// Read index.db.serial
 		if b, e = os.ReadFile(tmp); e != nil {
@@ -461,12 +470,14 @@ func (db *database) update() error {
 	}
 
 	// Sane permissions
-	f.Chmod(rwFilePerms)
+	if e = f.Chmod(0o600); e != nil {
+		return errors.Newf("failed to modify permissions: %w", e)
+	}
 
 	// Write entries
 	for _, entry := range db.entries {
-		f.WriteString(entry.String())
-		f.WriteString("\n")
+		_, _ = f.WriteString(entry.String())
+		_, _ = f.WriteString("\n")
 	}
 	f.Close()
 
@@ -477,11 +488,15 @@ func (db *database) update() error {
 	}
 
 	// Sane permissions
-	f.Chmod(rwFilePerms)
+	if e = f.Chmod(0o600); e != nil {
+		return errors.Newf("failed to modify permissions: %w", e)
+	}
 
 	// Write as hex
-	f.WriteString(hex.EncodeToString(db.serialNumber.Bytes()))
-	f.WriteString("\n")
+	_, _ = f.WriteString(
+		hex.EncodeToString(db.serialNumber.Bytes()),
+	)
+	_, _ = f.WriteString("\n")
 	f.Close()
 
 	return nil

@@ -115,7 +115,7 @@ func main() {
 
 	if flags.erase {
 		hl.PrintYellow("Erase PKI (y/N)? ")
-		fmt.Scanln(&answer)
+		_, _ = fmt.Scanln(&answer)
 
 		switch strings.TrimSpace(strings.ToLower(answer)) {
 		case "y", "yes":
