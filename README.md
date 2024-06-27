@@ -15,11 +15,8 @@ A tool to ease the headache of PKI infrastructure generation.
 Open a terminal and run the following:
 
 ```
-$ # For library usage
-$ go get --ldflags "-s -w" --trimpath -u github.com/mjwhitta/pki
-$ # For cli usage
-$ go install --ldflags "-s -w" --trimpath \
-    github.com/mjwhitta/pki/cmd/certify@latest
+$ go get -u github.com/mjwhitta/pki
+$ go install github.com/mjwhitta/pki/cmd/certify@latest
 ```
 
 Or compile from source:
