@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -23,8 +24,8 @@ const (
 
 // Flags
 var flags struct {
-	clients cli.StringList
 	cfg     string
+	clients cli.StringList
 	csr     cli.StringList
 	erase   bool
 	nocolor bool
@@ -40,27 +41,28 @@ func init() {
 	// Configure cli package
 	cli.Align = true
 	cli.Authors = []string{"Miles Whittaker <mj@whitta.dev>"}
-	cli.Banner = hl.Sprintf(
-		"%s [OPTIONS] [host1]...[hostN]",
-		os.Args[0],
-	)
+	cli.Banner = "" +
+		filepath.Base(os.Args[0]) + " [OPTIONS] [host1]...[hostN]"
 	cli.BugEmail = "pki.bugs@whitta.dev"
+
 	cli.ExitStatus(
 		"Normally the exit status is 0. In the event of an error the",
 		"exit status will be one of the below:\n\n",
-		hl.Sprintf("%d: Invalid option\n", InvalidOption),
-		hl.Sprintf("%d: Missing option\n", MissingOption),
-		hl.Sprintf("%d: Invalid argument\n", InvalidArgument),
-		hl.Sprintf("%d: Missing argument\n", MissingArgument),
-		hl.Sprintf("%d: Extra argument\n", ExtraArgument),
-		hl.Sprintf("%d: Exception", Exception),
+		fmt.Sprintf("%d: Invalid option\n", InvalidOption),
+		fmt.Sprintf("%d: Missing option\n", MissingOption),
+		fmt.Sprintf("%d: Invalid argument\n", InvalidArgument),
+		fmt.Sprintf("%d: Missing argument\n", MissingArgument),
+		fmt.Sprintf("%d: Extra argument\n", ExtraArgument),
+		fmt.Sprintf("%d: Exception", Exception),
 	)
 	cli.Info(
 		"Easily generate a self-signed CA and issue client/server",
 		"certificates. To add Subject Alternative Names (SANs), you",
-		"can append \":alt\" as many times as needed, for example:",
-		"hostN:alt1...:altN.",
+		"can append \":alt\" as many times as needed (e.g.",
+		"hostN:alt1...:altN). For wildcards you can use *.domain.tld",
+		"as an alt (e.g. domain.tld:*.domain.tld).",
 	)
+
 	cli.SeeAlso = []string{"openssl"}
 
 	// Parse cli flags
@@ -162,6 +164,7 @@ func validate() {
 			tmp++
 		}
 	}
+
 	if ((tmp > 0) && (len(flags.csr) > 0)) || (tmp > 1) {
 		cli.Usage(InvalidOption)
 	}
@@ -175,7 +178,9 @@ func validate() {
 
 	// Short circuit if version was requested
 	if flags.version {
-		hl.Printf("certifyme version %s\n", pki.Version)
+		fmt.Println(
+			filepath.Base(os.Args[0]) + " version " + pki.Version,
+		)
 		os.Exit(Good)
 	}
 }

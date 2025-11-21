@@ -40,10 +40,12 @@ func newEntry(cert *x509.Certificate) *certEntry {
 	entry.file = filepath.Join("certs", cn+".cert.pem")
 
 	// Build distinguished name to match OpenSSL format
+	//nolint:wastedassign // Not wasted, just initialized
 	for i, j := 0, 0; i < len(tmp)/2; i++ {
 		j = len(tmp) - i - 1
 		tmp[i], tmp[j] = tmp[j], tmp[i]
 	}
+
 	entry.name = "/" + strings.Join(tmp, "/")
 
 	// Check if expired
@@ -59,7 +61,7 @@ func parseEntry(str string) (*certEntry, error) {
 	var entry *certEntry
 	var tmp []string = strings.Split(str, "\t")
 
-	if len(tmp) != 6 {
+	if len(tmp) != 6 { //nolint:mnd // 6 tab-separated fields
 		return nil, errors.Newf("failed to parse cert entry: %s", str)
 	}
 

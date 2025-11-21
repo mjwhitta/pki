@@ -22,7 +22,7 @@ package pki
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
 	"math/big"
@@ -68,7 +68,7 @@ func New(root string, cfg *Cfg) (*PKI, error) {
 	p = &PKI{
 		Cfg:     cfg,
 		db:      db,
-		KeySize: 4096,
+		KeySize: 4096, //nolint:mnd // 4096 bits
 		Root:    root,
 	}
 
@@ -84,7 +84,7 @@ func New(root string, cfg *Cfg) (*PKI, error) {
 // already exist on disk, they will be parsed and returned instead.
 func (p *PKI) CreateCA() (*x509.Certificate, *rsa.PrivateKey, error) {
 	var e error
-	var pubkey any // *rsa.PublicKey
+	var pubkey *rsa.PublicKey
 
 	// Use existing key, if found, otherwise create
 	if p.key, e = p.createOrGetKey("ca"); e != nil {
@@ -101,6 +101,7 @@ func (p *PKI) CreateCA() (*x509.Certificate, *rsa.PrivateKey, error) {
 	if p.ca == nil {
 		// Create CA file
 		pubkey = &p.key.PublicKey
+
 		p.ca, e = p.createCert(nil, "ca", nil, pubkey, CACert)
 		if e != nil {
 			return nil, nil, e
@@ -116,7 +117,9 @@ func (p *PKI) CreateCA() (*x509.Certificate, *rsa.PrivateKey, error) {
 // already exist on disk, they will be parsed and returned instead.
 // See CertType for supported Certificate types.
 func (p *PKI) CreateCertFor(
-	cn string, certType CertType, alts ...string,
+	cn string,
+	certType CertType,
+	alts ...string,
 ) (*x509.Certificate, *rsa.PrivateKey, error) {
 	var cert *x509.Certificate
 	var csr *x509.CertificateRequest
@@ -158,7 +161,7 @@ func (p *PKI) createCert(
 	ca *x509.Certificate,
 	cn string,
 	csr *x509.CertificateRequest,
-	pubkey any, // *rsa.PublicKey
+	pubkey any, // *rsa.PublicKey,
 	certType CertType,
 ) (*x509.Certificate, error) {
 	var after time.Time
@@ -167,7 +170,7 @@ func (p *PKI) createCert(
 	var cert *x509.Certificate
 	var e error
 	var extUsage []x509.ExtKeyUsage
-	var hash [sha1.Size]byte
+	var hash [sha256.Size]byte
 	var sn *big.Int
 	var usage x509.KeyUsage
 
@@ -175,7 +178,8 @@ func (p *PKI) createCert(
 	if b, e = x509.MarshalPKIXPublicKey(pubkey); e != nil {
 		return nil, errors.Newf("failed to hash pubkey: %w", e)
 	}
-	hash = sha1.Sum(b)
+
+	hash = sha256.Sum256(b)
 
 	// Setup some shared params
 	before = time.Now()
@@ -189,8 +193,8 @@ func (p *PKI) createCert(
 			x509.ExtKeyUsageServerAuth,
 		}
 
-		// Use public key's hash as serial number
-		sn = big.NewInt(0).SetBytes(hash[:])
+		// Use first 16 bytes of public key's hash as serial number
+		sn = big.NewInt(0).SetBytes(hash[:16])
 
 		usage |= x509.KeyUsageCertSign
 		usage |= x509.KeyUsageCRLSign
@@ -218,7 +222,7 @@ func (p *PKI) createCert(
 			e = errors.Newf("no cert request provided for %s", cn)
 			return nil, e
 		} else if e = csr.CheckSignature(); e != nil {
-			return nil, e
+			return nil, e //nolint:wrapcheck // not external to repo
 		}
 
 		switch certType {
@@ -295,7 +299,9 @@ func (p *PKI) createCert(
 // CreateCSRFor will create a Certificate request for the specified
 // CommonName, signed by the provided private key.
 func (p *PKI) CreateCSRFor(
-	cn string, key *rsa.PrivateKey, alts ...string,
+	cn string,
+	key *rsa.PrivateKey,
+	alts ...string,
 ) (*x509.CertificateRequest, error) {
 	var b []byte
 	var csr *x509.CertificateRequest
@@ -354,7 +360,7 @@ func (p *PKI) CreateCSRFor(
 func (p *PKI) createOrGetCert(
 	cn string,
 	csr *x509.CertificateRequest,
-	pubkey any, // *rsa.PublicKey
+	pubkey any, // *rsa.PublicKey,
 	certType CertType,
 ) (*x509.Certificate, error) {
 	var cert *x509.Certificate
@@ -384,7 +390,9 @@ func (p *PKI) createOrGetCert(
 }
 
 func (p *PKI) createOrGetCSR(
-	cn string, key *rsa.PrivateKey, alts ...string,
+	cn string,
+	key *rsa.PrivateKey,
+	alts ...string,
 ) (*x509.CertificateRequest, error) {
 	var csr *x509.CertificateRequest
 	var e error
@@ -475,22 +483,23 @@ func (p *PKI) Erase() error {
 	return p.db.erase()
 }
 
-// Fingerprint will return the sha1 hash of the provided Certificate.
+// Fingerprint will return the sha256 hash of the provided
+// Certificate.
 func (p *PKI) Fingerprint(cert *x509.Certificate) string {
-	var hash [sha1.Size]byte
+	var hash [sha256.Size]byte
 
 	if cert == nil {
 		return ""
 	}
 
-	hash = sha1.Sum(cert.Raw)
+	hash = sha256.Sum256(cert.Raw)
 
 	return hex.EncodeToString(hash[:])
 }
 
-// FingerprintFor will return the sha1 hash of the Certificate for the
-// specified CommonName, should it exist. If the Certificate does not
-// exist or is revoked, it will return empty string.
+// FingerprintFor will return the sha256 hash of the Certificate for
+// the specified CommonName, should it exist. If the Certificate does
+// not exist or is revoked, it will return empty string.
 func (p *PKI) FingerprintFor(cn string) string {
 	var cert *x509.Certificate
 	var e error
@@ -850,18 +859,11 @@ func (p *PKI) Undo() error {
 		return errors.New("no entries to rollback")
 	}
 
-	// Delete files
+	// Delete files, but don't throw error here b/c files may have
+	// been manually deleted.
 	_ = deleteCert(p.Root, cn)
-	if p.HasCSRFor(cn) {
-		if e = deleteCSR(p.Root, cn); e != nil {
-			return e
-		}
-	}
-	if p.HasKeyFor(cn) {
-		if e = deleteKey(p.Root, cn); e != nil {
-			return e
-		}
-	}
+	_ = deleteCSR(p.Root, cn)
+	_ = deleteKey(p.Root, cn)
 
 	return nil
 }

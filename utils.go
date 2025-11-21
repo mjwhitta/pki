@@ -13,9 +13,8 @@ import (
 	"github.com/mjwhitta/pathname"
 )
 
-func copyTo(root string, dir string, fn string) error {
+func copyTo(root string, dir string, fn string) (e error) {
 	var dst string
-	var e error
 	var fr *os.File
 	var fw *os.File
 	var src string = filepath.Join(root, dir, fn)
@@ -35,15 +34,25 @@ func copyTo(root string, dir string, fn string) error {
 		dst = filepath.Join(root, "pems", fn)
 	}
 
+	src = filepath.Clean(src)
 	if fr, e = os.Open(src); e != nil {
 		return errors.Newf("failed to open %s: %w", src, e)
 	}
-	defer fr.Close()
+	defer func() {
+		if e == nil {
+			e = fr.Close()
+		}
+	}()
 
+	dst = filepath.Clean(dst)
 	if fw, e = os.Create(dst); e != nil {
 		return errors.Newf("failed to create %s: %w", dst, e)
 	}
-	defer fw.Close()
+	defer func() {
+		if e == nil {
+			e = fw.Close()
+		}
+	}()
 
 	if _, e = io.Copy(fw, fr); e != nil {
 		return errors.Newf("failed to copy %s to %s: %w", src, dst, e)
@@ -62,6 +71,7 @@ func createRWDir(dir string) error {
 		return nil
 	}
 
+	//nolint:mnd // u=rwx,go=-
 	if e = os.MkdirAll(dir, 0o700); e != nil {
 		e = errors.Newf("failed to create %s directory: %w", dir, e)
 		return e
@@ -181,6 +191,7 @@ func readCert(fn string) (*x509.Certificate, error) {
 	var cert *x509.Certificate
 	var e error
 
+	fn = filepath.Clean(fn)
 	if b, e = os.ReadFile(fn); e != nil {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
@@ -202,6 +213,7 @@ func readCSR(fn string) (*x509.CertificateRequest, error) {
 	var csr *x509.CertificateRequest
 	var e error
 
+	fn = filepath.Clean(fn)
 	if b, e = os.ReadFile(fn); e != nil {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
@@ -223,6 +235,7 @@ func readKey(fn string) (*rsa.PrivateKey, error) {
 	var e error
 	var key *rsa.PrivateKey
 
+	fn = filepath.Clean(fn)
 	if b, e = os.ReadFile(fn); e != nil {
 		return nil, errors.Newf("failed to read %s: %w", fn, e)
 	}
@@ -240,20 +253,22 @@ func readKey(fn string) (*rsa.PrivateKey, error) {
 
 func sigAlgForKey(key *rsa.PrivateKey) x509.SignatureAlgorithm {
 	if key != nil {
-		if key.N.BitLen() >= 4096 {
+		if key.N.BitLen() >= 4096 { //nolint:mnd // 512 * 8
 			return x509.SHA512WithRSA
-		} else if key.N.BitLen() >= 3072 {
+		} else if key.N.BitLen() >= 3072 { //nolint:mnd // 384 * 8
 			return x509.SHA384WithRSA
 		}
+
+		return x509.SHA256WithRSA
 	}
 
-	return x509.SHA256WithRSA
+	return x509.UnknownSignatureAlgorithm
 }
 
 func writeCert(root string, cn string, cert *x509.Certificate) error {
+	var b []byte
 	var dir string = "certs"
 	var e error
-	var f *os.File
 	var files []string
 
 	if cert == nil {
@@ -270,35 +285,35 @@ func writeCert(root string, cn string, cert *x509.Certificate) error {
 	}
 
 	for _, file := range files {
-		// Create file
-		if f, e = os.Create(file); e != nil {
-			return errors.Newf("failed to write cert %s: %w", file, e)
-		}
-
-		// Write file
-		if e = f.Chmod(0o600); e != nil {
-			return errors.Newf("failed to modify permissions: %w", e)
-		}
+		b = []byte{}
+		file = filepath.Clean(file)
 
 		if strings.HasSuffix(file, ".der") {
-			_, _ = f.Write(cert.Raw)
+			b = cert.Raw
 		} else if strings.HasSuffix(file, ".pem") {
-			_ = pem.Encode(
-				f,
+			b = pem.EncodeToMemory(
 				&pem.Block{Bytes: cert.Raw, Type: "CERTIFICATE"},
 			)
 		}
 
-		// Close file
-		f.Close()
+		if len(b) > 0 {
+			//nolint:mnd // u=rw,go=-
+			if e = os.WriteFile(file, b, 0o600); e != nil {
+				return errors.Newf(
+					"failed to write cert %s: %w",
+					file,
+					e,
+				)
+			}
+		}
 	}
 
 	return nil
 }
 
 func writeChain(root, cn string, certs ...*x509.Certificate) error {
+	var b []byte
 	var e error
-	var f *os.File
 	var files []string = []string{
 		filepath.Join(root, "ders", cn+".chain.der"),
 		filepath.Join(root, "pems", cn+".chain.pem"),
@@ -315,40 +330,46 @@ func writeChain(root, cn string, certs ...*x509.Certificate) error {
 	}
 
 	for _, file := range files {
-		// Create file
-		if f, e = os.Create(file); e != nil {
-			e = errors.Newf("failed to write chain %s: %w", file, e)
-			return e
-		}
+		b = []byte{}
+		file = filepath.Clean(file)
 
 		// Write each cert in chain
-		for _, cert := range certs {
-			// Write file
-			if e = f.Chmod(0o600); e != nil {
-				e = errors.Newf("failed to modify permissions: %w", e)
-				return e
+		if strings.HasSuffix(file, ".der") {
+			for _, cert := range certs {
+				b = append(b, cert.Raw...)
 			}
-
-			if strings.HasSuffix(file, ".der") {
-				_, _ = f.Write(cert.Raw)
-			} else if strings.HasSuffix(file, ".pem") {
-				_ = pem.Encode(
-					f,
-					&pem.Block{Bytes: cert.Raw, Type: "CERTIFICATE"},
+		} else if strings.HasSuffix(file, ".pem") {
+			for _, cert := range certs {
+				b = append(
+					b,
+					pem.EncodeToMemory(
+						&pem.Block{
+							Bytes: cert.Raw,
+							Type:  "CERTIFICATE",
+						},
+					)...,
 				)
 			}
 		}
 
-		// Close file
-		f.Close()
+		if len(b) > 0 {
+			//nolint:mnd // u=rw,go=-
+			if e = os.WriteFile(file, b, 0o600); e != nil {
+				return errors.Newf(
+					"failed to write chain %s: %w",
+					file,
+					e,
+				)
+			}
+		}
 	}
 
 	return nil
 }
 
 func writeCSR(root, cn string, csr *x509.CertificateRequest) error {
+	var b []byte
 	var e error
-	var f *os.File
 	var files []string = []string{
 		filepath.Join(root, "csr", cn+".csr.der"),
 		filepath.Join(root, "csr", cn+".csr.pem"),
@@ -359,25 +380,13 @@ func writeCSR(root, cn string, csr *x509.CertificateRequest) error {
 	}
 
 	for _, file := range files {
-		// Create file
-		if f, e = os.Create(file); e != nil {
-			return errors.Newf(
-				"failed to write cert request %s: %w",
-				file,
-				e,
-			)
-		}
-
-		// Write file
-		if e = f.Chmod(0o600); e != nil {
-			return errors.Newf("failed to modify permissions: %w", e)
-		}
+		b = []byte{}
+		file = filepath.Clean(file)
 
 		if strings.HasSuffix(file, ".der") {
-			_, _ = f.Write(csr.Raw)
+			b = csr.Raw
 		} else if strings.HasSuffix(file, ".pem") {
-			_ = pem.Encode(
-				f,
+			b = pem.EncodeToMemory(
 				&pem.Block{
 					Bytes: csr.Raw,
 					Type:  "CERTIFICATE REQUEST",
@@ -385,16 +394,24 @@ func writeCSR(root, cn string, csr *x509.CertificateRequest) error {
 			)
 		}
 
-		// Close file
-		f.Close()
+		if len(b) > 0 {
+			//nolint:mnd // u=rw,go=-
+			if e = os.WriteFile(file, b, 0o600); e != nil {
+				return errors.Newf(
+					"failed to write cert request %s: %w",
+					file,
+					e,
+				)
+			}
+		}
 	}
 
 	return nil
 }
 
 func writeKey(root string, cn string, key *rsa.PrivateKey) error {
+	var b []byte
 	var e error
-	var f *os.File
 	var files []string = []string{
 		filepath.Join(root, "private", cn+".key.der"),
 		filepath.Join(root, "private", cn+".key.pem"),
@@ -405,21 +422,13 @@ func writeKey(root string, cn string, key *rsa.PrivateKey) error {
 	}
 
 	for _, file := range files {
-		// Create file
-		if f, e = os.Create(file); e != nil {
-			return errors.Newf("failed to write key %s: %w", file, e)
-		}
-
-		// Write file
-		if e = f.Chmod(0o400); e != nil {
-			return errors.Newf("failed to modify permissions: %w", e)
-		}
+		b = []byte{}
+		file = filepath.Clean(file)
 
 		if strings.HasSuffix(file, ".der") {
-			_, _ = f.Write(x509.MarshalPKCS1PrivateKey(key))
+			b = x509.MarshalPKCS1PrivateKey(key)
 		} else if strings.HasSuffix(file, ".pem") {
-			_ = pem.Encode(
-				f,
+			b = pem.EncodeToMemory(
 				&pem.Block{
 					Bytes: x509.MarshalPKCS1PrivateKey(key),
 					Type:  "RSA PRIVATE KEY",
@@ -427,18 +436,29 @@ func writeKey(root string, cn string, key *rsa.PrivateKey) error {
 			)
 		}
 
-		// Close file
-		f.Close()
+		if len(b) > 0 {
+			//nolint:mnd // u=r,go=-
+			if e = os.WriteFile(file, b, 0o400); e != nil {
+				return errors.Newf(
+					"failed to write key %s: %w",
+					file,
+					e,
+				)
+			}
+		}
 	}
 
 	return nil
 }
 
 func writeKeyPair(
-	root, cn string, cert *x509.Certificate, key *rsa.PrivateKey,
+	root string,
+	cn string,
+	cert *x509.Certificate,
+	key *rsa.PrivateKey,
 ) error {
+	var b []byte
 	var e error
-	var f *os.File
 	var files []string = []string{
 		filepath.Join(root, "ders", cn+".der"),
 		filepath.Join(root, "pems", cn+".pem"),
@@ -451,36 +471,36 @@ func writeKeyPair(
 	}
 
 	for _, file := range files {
-		// Create file
-		if f, e = os.Create(file); e != nil {
-			e = errors.Newf("failed to write keypair %s: %w", file, e)
-			return e
-		}
-
-		// Write file
-		if e = f.Chmod(0o600); e != nil {
-			return errors.Newf("failed to modify permissions: %w", e)
-		}
+		b = []byte{}
+		file = filepath.Clean(file)
 
 		if strings.HasSuffix(file, ".der") {
-			_, _ = f.Write(cert.Raw)
-			_, _ = f.Write(x509.MarshalPKCS1PrivateKey(key))
+			b = cert.Raw
+			b = append(b, x509.MarshalPKCS1PrivateKey(key)...)
 		} else if strings.HasSuffix(file, ".pem") {
-			_ = pem.Encode(
-				f,
-				&pem.Block{Bytes: cert.Raw, Type: "CERTIFICATE"},
-			)
-			_ = pem.Encode(
-				f,
-				&pem.Block{
-					Bytes: x509.MarshalPKCS1PrivateKey(key),
-					Type:  "RSA PRIVATE KEY",
-				},
+			b = append(
+				pem.EncodeToMemory(
+					&pem.Block{Bytes: cert.Raw, Type: "CERTIFICATE"},
+				),
+				pem.EncodeToMemory(
+					&pem.Block{
+						Bytes: x509.MarshalPKCS1PrivateKey(key),
+						Type:  "RSA PRIVATE KEY",
+					},
+				)...,
 			)
 		}
 
-		// Close file
-		f.Close()
+		if len(b) > 0 {
+			//nolint:mnd // u=r,go=-
+			if e = os.WriteFile(file, b, 0o600); e != nil {
+				return errors.Newf(
+					"failed to write keypair %s: %w",
+					file,
+					e,
+				)
+			}
+		}
 	}
 
 	return nil

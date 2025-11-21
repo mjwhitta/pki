@@ -1,3 +1,4 @@
+//nolint:godoclint // These are tests
 package pki_test
 
 import (
@@ -27,7 +28,7 @@ func TestCfgFromFile(t *testing.T) {
 				var e error
 
 				c, e = pki.CfgFromFile(filepath.Join("testdata", cfg))
-				assert.NotNil(t, e)
+				assert.Error(t, e)
 				assert.Nil(t, c)
 			},
 		)
@@ -39,7 +40,7 @@ func TestCfgFromFile(t *testing.T) {
 		func(t *testing.T) {
 			var c *pki.Cfg
 			var e error
-			var tmp string = filepath.Join("testdata", "cfg")
+			var cfg string = filepath.Join("testdata", "cfg")
 
 			if runtime.GOOS == "windows" {
 				t.Skip("runtime OS not supported")
@@ -47,16 +48,16 @@ func TestCfgFromFile(t *testing.T) {
 
 			// Ensure perms get fixed b/c git
 			defer func() {
-				_ = os.Chmod(tmp, 0o600)
+				_ = os.Chmod(cfg, 0o600)
 			}()
 
 			// Ensure not readable
-			e = os.Chmod(tmp, 0o200)
-			assert.Nil(t, e)
+			e = os.Chmod(cfg, 0o200)
+			assert.NoError(t, e)
 
 			// Test not readable
-			c, e = pki.CfgFromFile(tmp)
-			assert.NotNil(t, e)
+			c, e = pki.CfgFromFile(cfg)
+			assert.Error(t, e)
 			assert.Nil(t, c)
 		},
 	)
@@ -74,7 +75,7 @@ func TestCfgFromFile(t *testing.T) {
 				var e error
 
 				c, e = pki.CfgFromFile(filepath.Join("testdata", cfg))
-				assert.Nil(t, e)
+				assert.NoError(t, e)
 				assert.NotNil(t, c)
 			},
 		)
@@ -102,7 +103,7 @@ func TestSetOption(t *testing.T) {
 				var c *pki.Cfg = pki.NewCfg()
 				var e error = c.SetOption(data[0], data[1])
 
-				assert.NotNil(t, e)
+				assert.Error(t, e)
 			},
 		)
 	}
@@ -111,18 +112,18 @@ func TestSetOption(t *testing.T) {
 func TestString(t *testing.T) {
 	var b []byte
 	var c *pki.Cfg
+	var cfg string = filepath.Join("testdata", "cfg")
 	var e error
 	var expected string
-	var tmp string = filepath.Join("testdata", "cfg")
 
 	// Get expected from file
-	b, e = os.ReadFile(tmp)
-	assert.Nil(t, e)
+	b, e = os.ReadFile(cfg) //nolint:gosec // G304 - false positive
+	assert.NoError(t, e)
 	assert.NotNil(t, b)
 
 	// Use default config
-	c, e = pki.CfgFromFile(tmp)
-	assert.Nil(t, e)
+	c, e = pki.CfgFromFile(cfg)
+	assert.NoError(t, e)
 	assert.NotNil(t, c)
 
 	expected = strings.TrimSpace(string(b))
@@ -130,7 +131,7 @@ func TestString(t *testing.T) {
 
 	// Use empty config
 	c, e = pki.CfgFromFile(filepath.Join("testdata", "emptycfg"))
-	assert.Nil(t, e)
+	assert.NoError(t, e)
 	assert.NotNil(t, c)
 
 	// Configure some corner cases

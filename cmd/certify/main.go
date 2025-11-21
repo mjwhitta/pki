@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/mjwhitta/cli"
@@ -12,14 +11,34 @@ import (
 	"github.com/mjwhitta/pki"
 )
 
+func erase(p *pki.PKI) error {
+	var answer string
+
+	fmt.Print(hl.Yellow("Erase PKI (y/N)? "))
+
+	_, _ = fmt.Scanln(&answer)
+
+	switch strings.TrimSpace(strings.ToLower(answer)) {
+	case "y", "yes":
+		log.Warn("Erasing PKI")
+
+		if e := p.Erase(); e != nil {
+			return errors.Newf("failed to erase PKI: %w", e)
+		}
+	}
+
+	return nil
+}
+
 func generateCerts(p *pki.PKI) error {
 	var alts []string
 	var e error
 
 	if !p.HasCA() {
 		log.Info("Creating CA")
+
 		if _, _, e = p.CreateCA(); e != nil {
-			return e
+			return errors.Newf("failed to create CA: %w", e)
 		}
 	} else {
 		log.SubInfo("Using existing CA")
@@ -28,8 +47,9 @@ func generateCerts(p *pki.PKI) error {
 	// Import cert requests, if provided
 	for _, csr := range flags.csr {
 		log.Infof("Importing cert request %s", csr)
+
 		if e = p.ImportCSR(csr); e != nil {
-			return e
+			return errors.Newf("failed to import CSR: %w", e)
 		}
 	}
 
@@ -40,13 +60,18 @@ func generateCerts(p *pki.PKI) error {
 
 		if !p.HasCertFor(client) {
 			log.Infof("Creating client cert for %s", client)
+
 			_, _, e = p.CreateCertFor(
 				client,
 				pki.ClientCert,
 				alts[1:]...,
 			)
 			if e != nil {
-				return e
+				return errors.Newf(
+					"failed to create client cert for %s: %w",
+					client,
+					e,
+				)
 			}
 		} else {
 			log.SubInfof("Client %s already has a cert", client)
@@ -60,13 +85,18 @@ func generateCerts(p *pki.PKI) error {
 
 		if !p.HasCertFor(server) {
 			log.Infof("Creating server cert for %s", server)
+
 			_, _, e = p.CreateCertFor(
 				server,
 				pki.ServerCert,
 				alts[1:]...,
 			)
 			if e != nil {
-				return e
+				return errors.Newf(
+					"failed to create server cert for %s: %w",
+					server,
+					e,
+				)
 			}
 		} else {
 			log.SubInfof("Server %s already has a cert", server)
@@ -80,13 +110,18 @@ func main() {
 	defer func() {
 		if r := recover(); r != nil {
 			if flags.verbose {
-				panic(r.(error).Error())
+				panic(r)
 			}
-			log.ErrX(Exception, r.(error).Error())
+
+			switch r := r.(type) {
+			case error:
+				log.ErrX(Exception, r.Error())
+			case string:
+				log.ErrX(Exception, r)
+			}
 		}
 	}()
 
-	var answer string
 	var c *pki.Cfg
 	var e error
 	var p *pki.PKI
@@ -101,8 +136,9 @@ func main() {
 		c.Country("US")
 		c.State("State name")
 		c.Unit("Department")
-		hl.Println(c.String())
-		os.Exit(Good)
+		fmt.Println(c.String())
+
+		return // Exit to skip sync
 	}
 
 	if c, e = pki.CfgFromFile(flags.cfg); e != nil {
@@ -114,31 +150,24 @@ func main() {
 	}
 
 	if flags.erase {
-		hl.PrintYellow("Erase PKI (y/N)? ")
-		_, _ = fmt.Scanln(&answer)
-
-		switch strings.TrimSpace(strings.ToLower(answer)) {
-		case "y", "yes":
-			log.Warn("Erasing PKI")
-			if e = p.Erase(); e != nil {
-				panic(errors.Newf("failed to erase PKI: %w", e))
-			}
+		if e = erase(p); e != nil {
+			panic(e)
 		}
 
-		os.Exit(Good) // Exit so as not to sync
+		return // Exit to skip sync
 	}
 
 	// All below options will Sync after
-	if flags.undo {
-		log.Warn("Rolling back PKI")
-		if e = p.Undo(); e != nil {
-			panic(errors.Newf("failed to rollback PKI: %w", e))
-		}
-	} else if flags.revoke {
-		if e = revokeCerts(p); e != nil {
-			panic(e)
-		}
-	} else if e = generateCerts(p); e != nil {
+	switch {
+	case flags.undo:
+		e = undo(p)
+	case flags.revoke:
+		e = revokeCerts(p)
+	default:
+		e = generateCerts(p)
+	}
+
+	if e != nil {
 		panic(e)
 	}
 
@@ -159,12 +188,27 @@ func revokeCerts(p *pki.PKI) error {
 	for _, cn := range append(flags.clients, cli.Args()...) {
 		if p.HasCertFor(cn) {
 			log.Warnf("Revoking cert for %s", cn)
+
 			if _, e = p.RevokeCertFor(cn); e != nil {
-				return e
+				return errors.Newf(
+					"failed to revoke cert for %s: %w",
+					cn,
+					e,
+				)
 			}
 		} else {
 			log.Warnf("No cert found for %s", cn)
 		}
+	}
+
+	return nil
+}
+
+func undo(p *pki.PKI) error {
+	log.Warn("Rolling back PKI")
+
+	if e := p.Undo(); e != nil {
+		return errors.Newf("failed to rollback PKI: %w", e)
 	}
 
 	return nil

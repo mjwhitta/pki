@@ -106,15 +106,15 @@ func (db *database) commit(wLock bool, t transaction) error {
 
 // erase will erase all files related to the PKI db.
 func (db *database) erase() error {
-	var rms []string = []string{
+	var files []string = []string{
 		"index.db",
 		"index.db.attr",
 		"index.db.serial",
 	}
 
-	for _, rm := range rms {
-		if e := os.RemoveAll(filepath.Join(db.root, rm)); e != nil {
-			return errors.Newf("failed to remove %s: %w", rm, e)
+	for _, fn := range files {
+		if e := os.RemoveAll(filepath.Join(db.root, fn)); e != nil {
+			return errors.Newf("failed to remove %s: %w", fn, e)
 		}
 	}
 
@@ -195,26 +195,22 @@ func (db *database) initialize() error {
 
 // initializeAttr will create index.db.attr if it's missing.
 func (db *database) initializeAttr() error {
-	var f *os.File
-	var tmp string = filepath.Join(db.root, "index.db.attr")
+	var fn string = filepath.Join(db.root, "index.db.attr")
 
 	// Create index.db.attr but for now there is no point in reading
 	// this file back in.
-	if ok, e := pathname.DoesExist(tmp); e != nil {
-		return errors.Newf("file %s not accessible: %w", tmp, e)
+	if ok, e := pathname.DoesExist(fn); e != nil {
+		return errors.Newf("file %s not accessible: %w", fn, e)
 	} else if !ok {
-		if f, e = os.Create(tmp); e != nil {
-			return errors.Newf("failed to create %s: %w", tmp, e)
+		e = os.WriteFile(
+			fn,
+			// For now this is hard-coded
+			[]byte("unique_subject = no\n"),
+			0o600, //nolint:mnd // u=rw,go=-
+		)
+		if e != nil {
+			return errors.Newf("failed to create %s: %w", fn, e)
 		}
-		defer f.Close()
-
-		// Sane permissions
-		if e = f.Chmod(0o600); e != nil {
-			return errors.Newf("failed to modify permissions: %w", e)
-		}
-
-		// For now this is hard-coded
-		_, _ = f.WriteString("unique_subject = no\n")
 	}
 
 	return nil
@@ -227,31 +223,25 @@ func (db *database) initializeDB() error {
 	var c *x509.Certificate
 	var e error
 	var entry *certEntry
-	var f *os.File
+	var fn string = filepath.Join(db.root, "index.db")
 	var ok bool
-	var tmp string = filepath.Join(db.root, "index.db")
 
 	// Reset
 	db.entries = []*certEntry{}
 	db.seen = map[string]struct{}{}
 
 	// Read or create index.db
-	if ok, e = pathname.DoesExist(tmp); e != nil {
-		return errors.Newf("file %s not accessible: %w", tmp, e)
+	if ok, e = pathname.DoesExist(fn); e != nil {
+		return errors.Newf("file %s not accessible: %w", fn, e)
 	} else if !ok {
-		if f, e = os.Create(tmp); e != nil {
-			return errors.Newf("failed to create %s: %w", tmp, e)
+		//nolint:mnd // u=rw,go=-
+		if e = os.WriteFile(fn, nil, 0o600); e != nil {
+			return errors.Newf("failed to create %s: %w", fn, e)
 		}
-
-		// Sane permissions
-		if e = f.Chmod(0o600); e != nil {
-			return errors.Newf("failed to modify permissions: %w", e)
-		}
-
-		f.Close()
 	} else {
-		if b, e = os.ReadFile(tmp); e != nil {
-			return errors.Newf("failed to read %s: %w", tmp, e)
+		fn = filepath.Clean(fn)
+		if b, e = os.ReadFile(fn); e != nil {
+			return errors.Newf("failed to read %s: %w", fn, e)
 		}
 
 		for _, line := range strings.Split(string(b), "\n") {
@@ -268,8 +258,8 @@ func (db *database) initializeDB() error {
 			if c, e = getCert(db.root, entry.cn); e != nil {
 				entry.file = "unknown"
 			} else if entry.file == "unknown" {
-				tmp = hex.EncodeToString(c.SerialNumber.Bytes())
-				if entry.sn == tmp {
+				fn = hex.EncodeToString(c.SerialNumber.Bytes())
+				if entry.sn == fn {
 					entry.file = filepath.Join(
 						"certs",
 						entry.cn+".cert.pem",
@@ -290,46 +280,44 @@ func (db *database) initializeDB() error {
 func (db *database) initializeSerial() error {
 	var b []byte
 	var e error
-	var f *os.File
+	var fn string = filepath.Join(db.root, "index.db.serial")
 	var ok bool
-	var tmp string = filepath.Join(db.root, "index.db.serial")
+	var serial string
+
+	fn = filepath.Clean(fn)
 
 	// Read or create index.db.serial
-	if ok, e = pathname.DoesExist(tmp); e != nil {
-		return errors.Newf("file %s not accessible: %w", tmp, e)
+	if ok, e = pathname.DoesExist(fn); e != nil {
+		return errors.Newf("file %s not accessible: %w", fn, e)
 	} else if !ok {
-		// Generate serial number
-		db.serialNumber, e = rand.Int(rand.Reader, big.NewInt(65535))
-		if e != nil {
+		// Generate random serial number
+		b = make([]byte, 16) //nolint:mnd // 128 bits
+		if _, e = rand.Read(b); e != nil {
 			e = errors.Newf("failed to generate serial number: %w", e)
 			return e
 		}
 
-		if f, e = os.Create(tmp); e != nil {
-			return errors.Newf("failed to create %s: %w", tmp, e)
-		}
-		defer f.Close()
-
-		// Sane permissions
-		if e = f.Chmod(0o600); e != nil {
-			return errors.Newf("failed to modify permissions: %w", e)
-		}
+		// Set serial number
+		db.serialNumber = big.NewInt(0).SetBytes(b)
 
 		// Write as hex
-		_, _ = f.WriteString(
-			hex.EncodeToString(db.serialNumber.Bytes()),
-		)
-		_, _ = f.WriteString("\n")
+		b = []byte(hex.EncodeToString(db.serialNumber.Bytes()) + "\n")
+
+		//nolint:mnd // u=rw,go=-
+		if e = os.WriteFile(fn, b, 0o600); e != nil {
+			return errors.Newf("failed to create %s: %w", fn, e)
+		}
 	} else {
 		// Read index.db.serial
-		if b, e = os.ReadFile(tmp); e != nil {
-			return errors.Newf("failed to read %s: %w", tmp, e)
+		if b, e = os.ReadFile(fn); e != nil {
+			return errors.Newf("failed to read %s: %w", fn, e)
 		}
 
 		// Decode hex string
-		tmp = strings.TrimSpace(string(b))
-		if b, e = hex.DecodeString(tmp); e != nil {
-			return errors.Newf("invalid serial number %s: %w", tmp, e)
+		serial = strings.TrimSpace(string(b))
+		if b, e = hex.DecodeString(serial); e != nil {
+			e = errors.Newf("invalid serial number %s: %w", serial, e)
+			return e
 		}
 
 		// Store serial number
@@ -344,10 +332,10 @@ func (db *database) initializeSerial() error {
 func (db *database) isRevoked(sn *big.Int) (bool, error) {
 	var revoked bool
 	var t transaction = func() error {
-		var tmp string = hex.EncodeToString(sn.Bytes())
+		var serial string = hex.EncodeToString(sn.Bytes())
 
 		for _, entry := range db.entries {
-			if entry.sn == tmp {
+			if entry.sn == serial {
 				revoked = entry.revoked
 				return nil
 			}
@@ -397,7 +385,11 @@ func (db *database) revokeCN(cn string) (*x509.Certificate, error) {
 		},
 	)
 
-	return c, e
+	if e != nil {
+		return nil, e
+	}
+
+	return c, nil
 }
 
 // revokeSN will update the PKI db to reflect that the cert with the
@@ -408,10 +400,10 @@ func (db *database) revokeSN(sn *big.Int) (string, error) {
 	var e error = db.commit(
 		true,
 		func() error {
-			var tmp string = hex.EncodeToString(sn.Bytes())
+			var serial string = hex.EncodeToString(sn.Bytes())
 
 			for _, entry := range db.entries {
-				if entry.sn == tmp {
+				if entry.sn == serial {
 					cn = entry.cn
 					return entry.revoke()
 				}
@@ -419,12 +411,16 @@ func (db *database) revokeSN(sn *big.Int) (string, error) {
 
 			return errors.Newf(
 				"cert with serial number %s not found",
-				tmp,
+				serial,
 			)
 		},
 	)
 
-	return cn, e
+	if e != nil {
+		return "", e
+	}
+
+	return cn, nil
 }
 
 // undo will delete the previous entry in the PKI db.
@@ -459,45 +455,52 @@ func (db *database) undo() (string, error) {
 	return cn, nil
 }
 
-func (db *database) update() error {
-	var e error
+func (db *database) update() (e error) {
 	var f *os.File
-	var tmp string = filepath.Join(db.root, "index.db")
-
-	// Write index.db
-	if f, e = os.Create(tmp); e != nil {
-		return errors.Newf("failed to create %s: %w", tmp, e)
+	var files []string = []string{
+		filepath.Join(db.root, "index.db"),
+		filepath.Join(db.root, "index.db.serial"),
 	}
 
+	// Write index.db
+	if f, e = os.Create(files[0]); e != nil {
+		return errors.Newf("failed to create %s: %w", files[0], e)
+	}
+	defer func(f *os.File) {
+		if e == nil {
+			e = f.Close()
+		}
+	}(f)
+
 	// Sane permissions
-	if e = f.Chmod(0o600); e != nil {
+	if e = f.Chmod(0o600); e != nil { //nolint:mnd // u=rw,go=-
 		return errors.Newf("failed to modify permissions: %w", e)
 	}
 
 	// Write entries
 	for _, entry := range db.entries {
-		_, _ = f.WriteString(entry.String())
-		_, _ = f.WriteString("\n")
+		_, _ = f.WriteString(entry.String() + "\n")
 	}
-	f.Close()
 
 	// Write index.db.serial
-	tmp = filepath.Join(db.root, "index.db.serial")
-	if f, e = os.Create(tmp); e != nil {
-		return errors.Newf("failed to create %s: %w", tmp, e)
+	if f, e = os.Create(filepath.Clean(files[1])); e != nil {
+		return errors.Newf("failed to create %s: %w", files[1], e)
 	}
+	defer func(f *os.File) {
+		if e == nil {
+			e = f.Close()
+		}
+	}(f)
 
 	// Sane permissions
-	if e = f.Chmod(0o600); e != nil {
+	if e = f.Chmod(0o600); e != nil { //nolint:mnd // u=rw,go=-
 		return errors.Newf("failed to modify permissions: %w", e)
 	}
 
 	// Write as hex
 	_, _ = f.WriteString(
-		hex.EncodeToString(db.serialNumber.Bytes()),
+		hex.EncodeToString(db.serialNumber.Bytes()) + "\n",
 	)
-	_, _ = f.WriteString("\n")
-	f.Close()
 
 	return nil
 }

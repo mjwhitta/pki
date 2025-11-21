@@ -1,13 +1,13 @@
 package pki
 
 import (
-	"bufio"
 	"crypto/x509/pkix"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/mjwhitta/errors"
+	"github.com/mjwhitta/pathname"
 )
 
 // Cfg contains any relevant configuration options for creating PKI
@@ -22,12 +22,9 @@ type Cfg struct {
 // CfgFromFile will parse the specified file and create a new Cfg
 // instance.
 func CfgFromFile(fn string) (*Cfg, error) {
+	var b []byte
 	var cfg *Cfg
 	var e error
-	var f *os.File
-	var line string
-	var s *bufio.Scanner
-	var tmp []string
 
 	if e = ensureExists("file", fn); e != nil {
 		return nil, e
@@ -35,14 +32,12 @@ func CfgFromFile(fn string) (*Cfg, error) {
 
 	cfg = NewCfg()
 
-	if f, e = os.Open(fn); e != nil {
+	if b, e = os.ReadFile(pathname.ExpandPath(fn)); e != nil {
 		return nil, errors.Newf("failed to read %s", fn)
 	}
-	defer f.Close()
 
-	s = bufio.NewScanner(f)
-	for s.Scan() {
-		line = strings.TrimSpace(s.Text())
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
 
 		// Ignore comments and empty lines
 		if (line == "") || strings.HasPrefix(line, "#") {
@@ -50,26 +45,24 @@ func CfgFromFile(fn string) (*Cfg, error) {
 		}
 
 		// Split option on =
-		tmp = strings.SplitN(line, "=", 2)
-		if len(tmp) != 2 {
-			return nil, errors.Newf("invalid config syntax: %s", line)
+		if k, v, ok := strings.Cut(line, "="); ok {
+			// Strip whitespace
+			k = strings.ToLower(strings.TrimSpace(k))
+			v = strings.TrimSpace(v)
+
+			// Strip leading and trailing ", if coming from bash
+			// CertifyMe
+			v = strings.TrimPrefix(v, "\"")
+			v = strings.TrimSuffix(v, "\"")
+
+			if e = cfg.SetOption(k, v); e != nil {
+				return nil, e
+			}
+
+			continue
 		}
 
-		// Normalize
-		tmp[0] = strings.ToLower(strings.TrimSpace(tmp[0]))
-		tmp[1] = strings.TrimSpace(tmp[1])
-
-		// Strip leading and trailing ", if coming from bash CertifyMe
-		tmp[1] = strings.TrimPrefix(tmp[1], "\"")
-		tmp[1] = strings.TrimSuffix(tmp[1], "\"")
-
-		if e = cfg.SetOption(tmp[0], tmp[1]); e != nil {
-			return nil, e
-		}
-	}
-
-	if e = s.Err(); e != nil {
-		return nil, errors.Newf("failed to parse %s", fn)
+		return nil, errors.Newf("invalid config syntax: %s", line)
 	}
 
 	return cfg, nil
@@ -78,8 +71,8 @@ func CfgFromFile(fn string) (*Cfg, error) {
 // NewCfg will create a new default instance of Cfg.
 func NewCfg() *Cfg {
 	return &Cfg{
-		CADaysValid:   365,
-		CertDaysValid: 365,
+		CADaysValid:   365, //nolint:mnd // 1 year
+		CertDaysValid: 365, //nolint:mnd // 1 year
 		subject:       map[string]string{"CN": "Self-signed CA"},
 	}
 }
@@ -177,13 +170,13 @@ func (cfg *Cfg) String() string {
 		"cacn = " + cfg.subject["CN"],
 	}
 
-	if cfg.CADaysValid == 365 {
+	if cfg.CADaysValid == 365 { //nolint:mnd // 1 year
 		out = append(out, "#cadays = 365")
 	} else {
 		out = append(out, "cadays = "+strconv.Itoa(cfg.CADaysValid))
 	}
 
-	if cfg.CertDaysValid == 365 {
+	if cfg.CertDaysValid == 365 { //nolint:mnd // 1 year
 		out = append(out, "#certdays = 365")
 	} else {
 		out = append(
