@@ -3,7 +3,7 @@ package pki
 import "github.com/mjwhitta/errors"
 
 // Version is the package version.
-const Version string = "1.5.2"
+const Version string = "1.5.3"
 
 // Errors
 var (
