@@ -222,7 +222,7 @@ func (p *PKI) createCert(
 			e = errors.Newf("no cert request provided for %s", cn)
 			return nil, e
 		} else if e = csr.CheckSignature(); e != nil {
-			return nil, e //nolint:wrapcheck // not external to repo
+			return nil, e //nolint:wrapcheck // Not external to repo
 		}
 
 		switch certType {
